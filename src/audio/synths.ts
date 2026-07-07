@@ -169,6 +169,48 @@ export function createInsects(ctx: AudioContext): Synth {
   };
 }
 
+const FIRE_CRACKLE_MIN_INTERVAL_MS = 80;
+const FIRE_CRACKLE_MAX_INTERVAL_MS = 600;
+const FIRE_CRACKLE_IDLE_CHECK_MS = 500; // intensity=0のときの再チェック間隔
+
+/** 焚き火のパチパチ音: ランダム間隔のバンドパスノイズバースト（30〜80ms）。setIntensityでレートとゲインが変わる。 */
+export function createFireCrackle(ctx: AudioContext): Synth {
+  const output = ctx.createGain();
+  output.gain.value = 0;
+  let intensity = 0;
+
+  function scheduleNext(): void {
+    const delay =
+      intensity > 0
+        ? (FIRE_CRACKLE_MIN_INTERVAL_MS +
+            Math.random() * (FIRE_CRACKLE_MAX_INTERVAL_MS - FIRE_CRACKLE_MIN_INTERVAL_MS)) /
+          Math.max(intensity, 0.1)
+        : FIRE_CRACKLE_IDLE_CHECK_MS;
+
+    setTimeout(() => {
+      if (intensity > 0) {
+        playNoiseBurst(ctx, output, {
+          duration: 0.03 + Math.random() * 0.05,
+          filterType: 'bandpass',
+          filterFreq: 1000 + Math.random() * 1000,
+          q: 2,
+          peakGain: 0.4 + intensity * 0.5,
+        });
+      }
+      scheduleNext();
+    }, delay);
+  }
+  scheduleNext();
+
+  return {
+    output,
+    setIntensity(v: number) {
+      intensity = Math.max(0, Math.min(v, 1));
+      output.gain.value = 0.4 + intensity * 0.6;
+    },
+  };
+}
+
 interface NoiseBurstOptions {
   duration: number;
   filterType: BiquadFilterType;

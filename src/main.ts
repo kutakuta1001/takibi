@@ -12,6 +12,7 @@ import { createWind, createRiver, createBirds, createInsects } from './audio/syn
 import { GameState } from './systems/GameState';
 import { Interaction } from './systems/Interaction';
 import { Chopping } from './systems/Chopping';
+import { Fire } from './systems/Fire';
 
 const RIVER_GAIN_MAX_DISTANCE = 40;
 const RIVER_GAIN_MAX = 0.6;
@@ -74,11 +75,15 @@ refreshInventory();
 
 const chopping = new Chopping(engine.scene, engine.camera, forest, audio, interaction);
 
+const fire = new Fire(engine.scene, gs, audio, terrain.heightAt(0, 0));
+interaction.add(fire.interactable);
+
 engine.onUpdate((dt) => {
   playerController.update(dt);
   sky.update(dt);
   gs.tick(dt);
   chopping.update(dt);
+  fire.update(dt, playerController.position);
 
   const distanceToRiver = Math.abs(playerController.position.x - Terrain.RIVER_X);
   const riverGain = Math.min(Math.max(1 - distanceToRiver / RIVER_GAIN_MAX_DISTANCE, 0), 1) * RIVER_GAIN_MAX;

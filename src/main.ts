@@ -1,12 +1,19 @@
 import { Engine } from './core/Engine';
+import { Input } from './core/Input';
 import { Title } from './ui/Title';
+import { HUD } from './ui/HUD';
 import { PanoScene } from './pano/PanoScene';
 import { LookControls } from './pano/LookControls';
 import { SpotManager, type Spot } from './pano/SpotManager';
+import { GameState } from './systems/GameState';
+import { Interaction } from './systems/Interaction';
+import { Chopping } from './foreground/Chopping';
 import { AudioEngine } from './audio/AudioEngine';
 import { createWind, createRiver, createBirds, createInsects } from './audio/synths';
 
-const EYE_HEIGHT = 1.6; // v1 PlayerController.EYE_HEIGHT を踏襲（前景3D配置の基準に使う）
+// campsite パノラマ内の実際の木の方向（yaw/pitch）。プレイテストで見た目に合わせて調整済み。
+const TREE_DIRECTION = { yaw: 0.5, pitch: -0.05 };
+const TREE_ANGULAR_RADIUS = 0.08; // rad（約4.6度）
 
 const SPOT_LABELS: Record<Spot['id'], string> = {
   campsite: 'キャンプ地',
@@ -48,7 +55,13 @@ if (placeholderGround) {
   engine.scene.remove(placeholderGround);
 }
 engine.scene.fog = null;
-engine.camera.position.set(0, EYE_HEIGHT, 0);
+// カメラはパノラマ球・Hotspot の方向ベクトルの原点である (0,0,0) に一致させる
+// （ここをずらすと Hotspot の yaw/pitch が指した方向と実際に見える位置がずれてしまう）。
+engine.camera.position.set(0, 0, 0);
+// WebGLRenderer.render は scene 側のグラフしか走査しないため、camera.add() で付けた
+// 斧ビューモデル等（camera の子）を描画させるには camera 自身を scene に入れる必要がある
+// （v1 から潜在していた不具合。camera.parent===null のままだと子オブジェクトは常に非表示になる）。
+engine.scene.add(engine.camera);
 
 // スポットごとに PanoScene を1つずつ用意し、可視状態の切替でクロスフェード先を表示する
 // （テクスチャの再読込を避けるため、遷移のたびに作り直さない）。
@@ -81,11 +94,37 @@ function applyAudioMix(spot: Spot): void {
   insects.setIntensity(spot.audioMix.insects ? 0 : 1);
 }
 
+const gs = new GameState();
+const hud = new HUD();
+const input = new Input();
+const interaction = new Interaction(engine.camera, input, gs, engine.renderer.domElement);
+interaction.onBlocked((message) => hud.flashMessage(message));
+
+function refreshInventory(): void {
+  hud.setInventory(gs.logs, gs.kettle);
+}
+gs.on('logs-changed', refreshInventory);
+gs.on('kettle-changed', refreshInventory);
+refreshInventory();
+
+const chopping = new Chopping(engine.scene, engine.camera, audio, gs, TREE_DIRECTION, TREE_ANGULAR_RADIUS);
+
+/** campsite にいる間だけ伐採ホットスポットを有効にする（riverside では同じ方向に木は無い）。 */
+function updateHotspotsForSpot(spotId: Spot['id']): void {
+  if (spotId === 'campsite') {
+    interaction.add(chopping.hotspot);
+  } else {
+    interaction.remove(chopping.hotspot);
+  }
+}
+updateHotspotsForSpot(SPOTS[0].id);
+
 const spotManager = new SpotManager(SPOTS, (spot) => {
   for (const [id, pano] of panoScenes) {
     pano.mesh.visible = id === spot.id;
   }
   applyAudioMix(spot);
+  updateHotspotsForSpot(spot.id);
   updateSpotButton();
 });
 applyAudioMix(SPOTS[0]);
@@ -127,8 +166,14 @@ engine.onUpdate((dt) => {
   spotManager.update(dt);
   lookControls.enabled = !spotManager.busy;
   lookControls.update(dt);
+  chopping.update(dt);
+  gs.tick(dt);
+
   fadeOverlay.style.opacity = String(spotManager.fadeOpacity);
   spotButton.style.visibility = spotManager.busy ? 'hidden' : 'visible';
+
+  const { prompt } = interaction.update();
+  hud.setPrompt(prompt);
 });
 
 const title = new Title(

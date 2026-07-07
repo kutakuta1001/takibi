@@ -1,16 +1,7 @@
 export class Title {
   private readonly element: HTMLDivElement;
-  private readonly onStart: () => void;
-  private readonly handlePointerLockChange = (): void => {
-    if (document.pointerLockElement === document.body) {
-      this.hide();
-      this.onStart();
-    }
-  };
 
   constructor(onStart: () => void, onUnlock?: () => void) {
-    this.onStart = onStart;
-
     this.element = document.createElement('div');
     this.element.style.position = 'fixed';
     this.element.style.inset = '0';
@@ -36,7 +27,7 @@ export class Title {
     startHint.style.fontSize = '1.1rem';
 
     const controls = document.createElement('div');
-    controls.textContent = 'WASD 移動　　マウス 視点　　E アクション';
+    controls.textContent = 'マウスドラッグで見回す';
     controls.style.fontSize = '0.9rem';
     controls.style.opacity = '0.75';
 
@@ -44,10 +35,9 @@ export class Title {
 
     this.element.addEventListener('click', () => {
       onUnlock?.();
-      document.body.requestPointerLock();
+      this.hide();
+      onStart();
     });
-
-    document.addEventListener('pointerlockchange', this.handlePointerLockChange);
   }
 
   show(): void {

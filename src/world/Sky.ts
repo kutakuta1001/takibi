@@ -16,6 +16,14 @@ const HEMI_INTENSITY_NIGHT = 0.12;
 const ENV_INTENSITY_DAY = 1.0;
 const ENV_INTENSITY_NIGHT = 0.1;
 
+const STAR_HIDE_DAYNESS = 0.25; // これ以上明るい間（昼・夕方含む）は星を完全非表示にする
+// sky シェーダの h = normalize(vWorldPosition).y*0.5+0.5 は、カメラがほぼ水平を見る地平線方向では
+// 常に h≈0.5（水平方向の視線は空半球の中心付近を向くため）。フォグ色は遠景がその地平線色に
+// 沈み込む色なので、bottomColor 単体ではなく top/bottom を 50% ブレンドした「見た目の地平線色」に
+// 合わせないと、遠景の木がフォグで白飛びして空と馴染まない（bottomColor は白に近いが実際の
+// 地平線はもっと青みがかっている）。
+const FOG_HORIZON_BLEND = 0.5;
+
 const SUN_SHADOW_MAP_SIZE = 2048;
 const SUN_SHADOW_HALF_EXTENT = 40; // 正方影範囲: プレイヤー中心 ±40m
 const SUN_SHADOW_NEAR = 1;
@@ -86,8 +94,8 @@ export class Sky {
     this.dayBottom = new THREE.Color(theme.sky.dayBottom);
     this.nightTop = new THREE.Color(theme.sky.nightTop);
     this.nightBottom = new THREE.Color(theme.sky.nightBottom);
-    this.fogDay = new THREE.Color(theme.sky.dayBottom);
-    this.fogNight = new THREE.Color(theme.sky.nightBottom);
+    this.fogDay = this.dayBottom.clone().lerp(this.dayTop, FOG_HORIZON_BLEND);
+    this.fogNight = this.nightBottom.clone().lerp(this.nightTop, FOG_HORIZON_BLEND);
 
     this.sunLight = new THREE.DirectionalLight(0xffffff, SUN_INTENSITY_DAY);
     this.sunLight.castShadow = true;
@@ -187,7 +195,11 @@ export class Sky {
     bottomUniform.copy(this.nightBottom).lerp(this.dayBottom, dayness);
 
     const starsMaterial = this.stars.material as THREE.PointsMaterial;
-    starsMaterial.opacity = 1 - dayness;
+    const starVisible = dayness < STAR_HIDE_DAYNESS;
+    this.stars.visible = starVisible;
+    starsMaterial.opacity = starVisible
+      ? THREE.MathUtils.clamp(1 - dayness / STAR_HIDE_DAYNESS, 0, 1)
+      : 0;
 
     if (this.scene.fog instanceof THREE.FogExp2) {
       this.scene.fog.color.copy(this.fogNight).lerp(this.fogDay, dayness);

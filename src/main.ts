@@ -80,7 +80,7 @@ engine.scene.add(forest.group);
 
 const riverVisual = new River(engine.scene, terrain);
 
-const sky = new Sky(engine.scene, theme);
+const sky = new Sky(engine.scene, theme, engine.hemiLight);
 
 const audio = new AudioEngine();
 

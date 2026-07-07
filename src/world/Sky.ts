@@ -11,6 +11,10 @@ const SUN_INTENSITY_DAY = 1.2;
 const SUN_INTENSITY_NIGHT = 0.05;
 const MOON_COLOR = 0x8899bb;
 const MOON_INTENSITY_MAX = 0.15;
+const HEMI_INTENSITY_DAY = 1.3;
+const HEMI_INTENSITY_NIGHT = 0.12;
+const ENV_INTENSITY_DAY = 1.0;
+const ENV_INTENSITY_NIGHT = 0.1;
 
 const SUN_SHADOW_MAP_SIZE = 2048;
 const SUN_SHADOW_HALF_EXTENT = 40; // 正方影範囲: プレイヤー中心 ±40m
@@ -71,7 +75,11 @@ export class Sky {
   private readonly fogDay: THREE.Color;
   private readonly fogNight: THREE.Color;
 
-  constructor(scene: THREE.Scene, theme: Theme) {
+  constructor(
+    scene: THREE.Scene,
+    theme: Theme,
+    private readonly hemiLight?: THREE.HemisphereLight
+  ) {
     this.scene = scene;
 
     this.dayTop = new THREE.Color(theme.sky.dayTop);
@@ -162,6 +170,16 @@ export class Sky {
 
     this.moonLight.position.set(-sunDirX, -sunDirY, -sunDirZ);
     this.moonLight.intensity = MOON_INTENSITY_MAX * (1 - dayness);
+
+    // 環境光（HemisphereLight）も dayness に連動させる。固定強度のままだと夜でも
+    // 地面が昼と同じ明るさで光ってしまうため（V6で発見した不整合）。
+    if (this.hemiLight) {
+      this.hemiLight.intensity = THREE.MathUtils.lerp(HEMI_INTENSITY_NIGHT, HEMI_INTENSITY_DAY, dayness);
+    }
+
+    // scene.environment（PMREM の簡易空環境）は常に昼の色で焼き込んでいるため、
+    // 強度そのものを dayness で落とさないと夜でも地面が明るいままになる。
+    this.scene.environmentIntensity = THREE.MathUtils.lerp(ENV_INTENSITY_NIGHT, ENV_INTENSITY_DAY, dayness);
 
     const topUniform = this.skyMaterial.uniforms.topColor.value as THREE.Color;
     const bottomUniform = this.skyMaterial.uniforms.bottomColor.value as THREE.Color;

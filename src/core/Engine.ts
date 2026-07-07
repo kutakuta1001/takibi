@@ -8,6 +8,7 @@ export class Engine {
   readonly scene: THREE.Scene;
   readonly camera: THREE.PerspectiveCamera;
   readonly renderer: THREE.WebGLRenderer;
+  readonly hemiLight: THREE.HemisphereLight;
 
   private readonly clock: THREE.Clock;
   private readonly updateCallbacks: Array<(dt: number) => void> = [];
@@ -28,14 +29,15 @@ export class Engine {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.1;
+    this.renderer.toneMappingExposure = 1.2;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(this.renderer.domElement);
 
-    const hemiLight = new THREE.HemisphereLight(0xbfd4e5, 0x3e2f23, 1.0);
-    this.scene.add(hemiLight);
+    // 強度は Sky.update が dayness に応じて上書きする（初期値はここでは仮値）。
+    this.hemiLight = new THREE.HemisphereLight(0xbfd4e5, 0x3e2f23, 1.0);
+    this.scene.add(this.hemiLight);
 
     const groundGeometry = new THREE.PlaneGeometry(200, 200);
     const groundMaterial = new THREE.MeshStandardMaterial({ color: theme.ground.color });

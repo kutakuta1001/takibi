@@ -23,6 +23,7 @@ export class Interaction {
   private readonly raycaster = new THREE.Raycaster();
   private readonly blockedCallbacks: Array<(message: string) => void> = [];
   private currentTarget: Interactable | null = null;
+  private enabled = true;
 
   constructor(
     private readonly camera: THREE.Camera,
@@ -47,7 +48,17 @@ export class Interaction {
     this.blockedCallbacks.push(cb);
   }
 
+  /** 座りシーケンスなど、演出中に一時的にレイキャスト判定とEキーを無効化する。 */
+  setEnabled(enabled: boolean): void {
+    this.enabled = enabled;
+    if (!enabled) {
+      this.currentTarget = null;
+    }
+  }
+
   update(): { prompt: string | null } {
+    if (!this.enabled) return { prompt: null };
+
     this.currentTarget = this.findTarget();
     if (this.currentTarget && this.currentTarget.canInteract(this.gs)) {
       return { prompt: this.currentTarget.prompt(this.gs) };
@@ -72,6 +83,8 @@ export class Interaction {
   }
 
   private handleInteractKey(): void {
+    if (!this.enabled) return;
+
     const target = this.currentTarget;
     if (!target) return;
 

@@ -269,3 +269,24 @@ export function playWaterFill(ctx: AudioContext, dest: AudioNode): void {
 export function playSip(ctx: AudioContext, dest: AudioNode): void {
   playNoiseBurst(ctx, dest, { duration: 0.35, filterType: 'bandpass', filterFreq: 600, q: 1.5, peakGain: 0.5 });
 }
+
+/** コーヒー完成を知らせる、柔らかい2音のチャイム。 */
+export function playChime(ctx: AudioContext, dest: AudioNode): void {
+  const now = ctx.currentTime;
+  const freqs = [880, 1108.73]; // A5 + Cis6 程度の柔らかい響き
+
+  for (const freq of freqs) {
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+
+    const envelope = ctx.createGain();
+    envelope.gain.setValueAtTime(0, now);
+    envelope.gain.linearRampToValueAtTime(0.25, now + 0.05);
+    envelope.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+
+    osc.connect(envelope).connect(dest);
+    osc.start(now);
+    osc.stop(now + 1.2);
+  }
+}

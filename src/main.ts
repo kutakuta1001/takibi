@@ -13,6 +13,8 @@ import { GameState } from './systems/GameState';
 import { Interaction } from './systems/Interaction';
 import { Chopping } from './systems/Chopping';
 import { Fire } from './systems/Fire';
+import { WaterZone } from './systems/Water';
+import { Cooking } from './systems/Cooking';
 
 const RIVER_GAIN_MAX_DISTANCE = 40;
 const RIVER_GAIN_MAX = 0.6;
@@ -78,12 +80,19 @@ const chopping = new Chopping(engine.scene, engine.camera, forest, audio, intera
 const fire = new Fire(engine.scene, gs, audio, terrain.heightAt(0, 0));
 interaction.add(fire.interactable);
 
+const waterZone = new WaterZone(engine.scene, audio);
+interaction.add(waterZone);
+
+const cooking = new Cooking(gs, fire, hud, audio, playerController, interaction, engine.scene, engine.camera);
+interaction.add(cooking.fireKettleInteractable);
+
 engine.onUpdate((dt) => {
   playerController.update(dt);
   sky.update(dt);
   gs.tick(dt);
   chopping.update(dt);
   fire.update(dt, playerController.position);
+  cooking.update(dt);
 
   const distanceToRiver = Math.abs(playerController.position.x - Terrain.RIVER_X);
   const riverGain = Math.min(Math.max(1 - distanceToRiver / RIVER_GAIN_MAX_DISTANCE, 0), 1) * RIVER_GAIN_MAX;

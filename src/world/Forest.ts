@@ -21,6 +21,8 @@ const LEAF_SEGMENTS = 8;
 const LEAF_TRUNK_OVERLAP = 0.4; // 下段の葉が幹に少し被る量
 const LEAF_TIER_GAP = 0.55; // 上段の葉を下段からどれだけ持ち上げるか（下段高さ比）
 const LEAF_COLOR_VARIATION = 0.2; // per-instance の色ばらつき（±10%）
+const LEAF_NORMAL_VERTICAL_SQUASH = 0.55; // フェイク法線の縦成分を弱め、球面的になだらかに変化させる
+const LEAF_NORMAL_UP_BIAS = 0.25; // 法線に上向き成分を混ぜ、陰側でも環境光を拾わせて完全な黒つぶれを防ぐ
 
 const CAMP_EXCLUSION_RADIUS = 12;
 const POSITION_ATTEMPTS = 30;
@@ -58,14 +60,45 @@ function isFreeOfExclusionZones(x: number, z: number, terrain: Terrain): boolean
   return true;
 }
 
+/**
+ * コーンの実法線をそのまま使うと、低ポリ（LEAF_SEGMENTS面）の各面が太陽から見て
+ * 陰になる側でフラットな黒三角として浮いて見える（面同士の N・L 差が大きすぎるため）。
+ * 針葉樹の葉のような塊表現では、法線を「軸上の点から外向きに球面化」したフェイク法線に
+ * 置き換えるのが定石: 頂点位置を球/楕円体の法線として扱うことで陰影がなだらかに連続し、
+ * 黒い面が消える。さらに上向き成分を混ぜて陰側でも環境光（HemisphereLight）を拾わせる。
+ * 平行移動（translate）は法線に影響しないため、コーン単体（軸中心が原点）の時点で計算する。
+ */
+function applyFakeFoliageNormals(geometry: THREE.BufferGeometry): void {
+  const position = geometry.attributes.position;
+  const normal = geometry.attributes.normal;
+  const fake = new THREE.Vector3();
+  for (let i = 0; i < position.count; i++) {
+    const x = position.getX(i);
+    const y = position.getY(i);
+    const z = position.getZ(i);
+    fake.set(x, y * LEAF_NORMAL_VERTICAL_SQUASH, z);
+    if (fake.lengthSq() < 1e-6) {
+      fake.set(0, 1, 0); // コーン先端の特異点は上向きに固定
+    } else {
+      fake.normalize();
+    }
+    fake.y += LEAF_NORMAL_UP_BIAS;
+    fake.normalize();
+    normal.setXYZ(i, fake.x, fake.y, fake.z);
+  }
+  normal.needsUpdate = true;
+}
+
 /** 幹の上に2段重ねた葉のジオメトリを1つの BufferGeometry に統合する（InstancedMesh を1本/木に保つため）。 */
 function buildLayeredLeafGeometry(): THREE.BufferGeometry {
   const lowerY = TRUNK_HEIGHT - LEAF_TRUNK_OVERLAP + LEAF_HEIGHT / 2;
   const upperY = lowerY + LEAF_HEIGHT * LEAF_TIER_GAP;
 
   const lower = new THREE.ConeGeometry(LEAF_RADIUS, LEAF_HEIGHT, LEAF_SEGMENTS);
+  applyFakeFoliageNormals(lower);
   lower.translate(0, lowerY, 0);
   const upper = new THREE.ConeGeometry(LEAF_RADIUS, LEAF_HEIGHT, LEAF_SEGMENTS);
+  applyFakeFoliageNormals(upper);
   upper.translate(0, upperY, 0);
 
   return mergeGeometries([lower, upper]);

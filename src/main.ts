@@ -4,6 +4,7 @@ import { PlayerController } from './core/PlayerController';
 import { Title } from './ui/Title';
 import { Terrain } from './world/Terrain';
 import { Forest } from './world/Forest';
+import { Sky } from './world/Sky';
 import { ForestTheme } from './theme/ForestTheme';
 
 // テーマの切替点。雪山対応時はここを SnowTheme に変更するだけでよい。
@@ -27,6 +28,8 @@ engine.scene.add(terrain.mesh);
 const forest = new Forest(theme, terrain);
 engine.scene.add(forest.group);
 
+const sky = new Sky(engine.scene, theme);
+
 const input = new Input();
 const playerController = new PlayerController(engine.camera, input, (x, z) =>
   terrain.heightAt(x, z)
@@ -34,6 +37,7 @@ const playerController = new PlayerController(engine.camera, input, (x, z) =>
 
 engine.onUpdate((dt) => {
   playerController.update(dt);
+  sky.update(dt);
 });
 
 const title = new Title(() => {

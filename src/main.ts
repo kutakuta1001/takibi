@@ -3,6 +3,7 @@ import { Input } from './core/Input';
 import { PlayerController } from './core/PlayerController';
 import { Title } from './ui/Title';
 import { Terrain } from './world/Terrain';
+import { Forest } from './world/Forest';
 import { ForestTheme } from './theme/ForestTheme';
 
 // テーマの切替点。雪山対応時はここを SnowTheme に変更するだけでよい。
@@ -22,6 +23,9 @@ if (placeholderGround) {
 
 const terrain = new Terrain(theme);
 engine.scene.add(terrain.mesh);
+
+const forest = new Forest(theme, terrain);
+engine.scene.add(forest.group);
 
 const input = new Input();
 const playerController = new PlayerController(engine.camera, input, (x, z) =>

@@ -34,6 +34,7 @@ export class Engine {
     const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x4a5d3a });
     const ground = new THREE.Mesh(groundGeometry, groundMaterial);
     ground.rotation.x = -Math.PI / 2;
+    ground.name = 'placeholder-ground';
     this.scene.add(ground);
 
     this.clock = new THREE.Clock();

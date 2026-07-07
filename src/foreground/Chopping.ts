@@ -51,6 +51,11 @@ export class Chopping {
     camera.add(this.axeGroup);
   }
 
+  /** 斧ビューモデルの表示/非表示（campsite にいる間だけ表示する。main.ts がスポット切替で呼ぶ）。 */
+  setVisible(visible: boolean): void {
+    this.axeGroup.visible = visible;
+  }
+
   update(dt: number): void {
     this.updateAxeSwing(dt);
   }

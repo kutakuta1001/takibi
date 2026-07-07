@@ -154,6 +154,12 @@ export class Fire {
     };
   }
 
+  /** 焚き火本体・火の粉の表示/非表示（campsite にいる間だけ表示する。main.ts がスポット切替で呼ぶ）。 */
+  setVisible(visible: boolean): void {
+    this.group.visible = visible;
+    this.sparkPoints.visible = visible;
+  }
+
   update(dt: number): void {
     this.time += dt;
     const intensity = this.gs.fireIntensity;

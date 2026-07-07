@@ -44,6 +44,15 @@ export class LookControls {
   private lastMoveTime = 0;
   private animation: LookAtAnimation | null = null;
 
+  /** 現在の視点（Cooking の座って飲む演出が、終了後に元の視点へ戻すために使う）。 */
+  get currentYaw(): number {
+    return this.yaw;
+  }
+
+  get currentPitch(): number {
+    return this.pitch;
+  }
+
   private readonly onPointerDown = (e: PointerEvent): void => {
     if (!this.enabled) return;
     this.dragging = true;

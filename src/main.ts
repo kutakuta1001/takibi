@@ -10,6 +10,7 @@ import { GameState } from './systems/GameState';
 import { Interaction } from './systems/Interaction';
 import { Chopping } from './foreground/Chopping';
 import { Fire } from './foreground/Fire';
+import { Cooking } from './foreground/Cooking';
 import { AudioEngine } from './audio/AudioEngine';
 import { createWind, createRiver, createBirds, createInsects } from './audio/synths';
 
@@ -20,6 +21,12 @@ const TREE_ANGULAR_RADIUS = 0.08; // rad（約4.6度）
 // 焚き火はカメラ（原点・目線高さ）から約2.5m先の地面。EYE_HEIGHTだけ下げて地面基準にする。
 const EYE_HEIGHT = 1.6;
 const FIRE_POSITION = new THREE.Vector3(0, -EYE_HEIGHT, -2.5);
+// 座って飲む演出でLookControls.lookAtが向く先（焚き火の方向とほぼ同じ、やや浅め）。
+const FIRE_LOOK_DIRECTION = { yaw: 0, pitch: -0.5 };
+
+// riverside パノラマ内の水面の方向（yaw/pitch）。プレイテストで見た目に合わせて調整済み。
+const WATER_DIRECTION = { yaw: 0.81, pitch: -0.31 };
+const WATER_ANGULAR_RADIUS = 0.15; // rad（約8.6度、水面は的が大きいのでTREE_ANGULAR_RADIUSより広め）
 
 const SPOT_LABELS: Record<Spot['id'], string> = {
   campsite: 'キャンプ地',
@@ -126,15 +133,42 @@ refreshInventory();
 
 const chopping = new Chopping(engine.scene, engine.camera, audio, gs, TREE_DIRECTION, TREE_ANGULAR_RADIUS);
 const fire = new Fire(engine.scene, gs, audio, FIRE_POSITION);
+const cooking = new Cooking(
+  gs,
+  hud,
+  audio,
+  interaction,
+  lookControls,
+  engine.scene,
+  engine.camera,
+  FIRE_POSITION,
+  FIRE_LOOK_DIRECTION,
+  WATER_DIRECTION,
+  WATER_ANGULAR_RADIUS
+);
 
-/** campsite にいる間だけ伐採・焚き火のホットスポットを有効にする（riverside には無い）。 */
+/**
+ * 伐採・焚き火・ケトルは campsite だけ、水汲みは riverside だけで有効にする。
+ * ホットスポットの登録/解除（レイキャスト対象）だけでなく、焚き火・斧・ケトルの3D表示自体も
+ * 切り替える（これらは常にシーンに存在するため、切り替えないと別スポットに透けて見えてしまう）。
+ */
 function updateHotspotsForSpot(spotId: Spot['id']): void {
-  if (spotId === 'campsite') {
+  const atCampsite = spotId === 'campsite';
+
+  chopping.setVisible(atCampsite);
+  fire.setVisible(atCampsite);
+  cooking.setVisible(atCampsite);
+
+  if (atCampsite) {
     interaction.add(chopping.hotspot);
     interaction.add(fire.interactable);
+    interaction.add(cooking.fireKettleInteractable);
+    interaction.remove(cooking.waterHotspot);
   } else {
     interaction.remove(chopping.hotspot);
     interaction.remove(fire.interactable);
+    interaction.remove(cooking.fireKettleInteractable);
+    interaction.add(cooking.waterHotspot);
   }
 }
 updateHotspotsForSpot(SPOTS[0].id);
@@ -164,6 +198,7 @@ spotButton.style.borderRadius = '999px';
 spotButton.style.cursor = 'pointer';
 spotButton.style.pointerEvents = 'auto';
 spotButton.addEventListener('click', () => {
+  if (cooking.isSitting) return; // 座って飲む演出中はスポット遷移を始めない
   void spotManager.transitionTo(otherSpotId(spotManager.current));
 });
 uiRoot.appendChild(spotButton);
@@ -184,14 +219,17 @@ uiRoot.appendChild(fadeOverlay);
 
 engine.onUpdate((dt) => {
   spotManager.update(dt);
-  lookControls.enabled = !spotManager.busy;
+  // スポット遷移中・座って飲む演出中はユーザーのドラッグ見回しを止める
+  // （lookControls.enabled の書き手が複数あるため、毎フレームここで合成する）。
+  lookControls.enabled = !spotManager.busy && !cooking.isSitting;
   lookControls.update(dt);
   chopping.update(dt);
   fire.update(dt);
+  cooking.update(dt);
   gs.tick(dt);
 
   fadeOverlay.style.opacity = String(spotManager.fadeOpacity);
-  spotButton.style.visibility = spotManager.busy ? 'hidden' : 'visible';
+  spotButton.style.visibility = spotManager.busy || cooking.isSitting ? 'hidden' : 'visible';
 
   const { prompt } = interaction.update();
   hud.setPrompt(prompt);

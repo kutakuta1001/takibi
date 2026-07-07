@@ -9,7 +9,6 @@ const RIVER_X = 30;
 const RIVER_CARVE_HALF_WIDTH = 6;
 const RIVER_CARVE_DEPTH = 2.5;
 const RIVER_ZONE_HALF_WIDTH = 4;
-const RIVER_SURFACE_WIDTH = 8;
 const SEGMENTS = 128;
 
 // 川岸ブレンド: 水面の縁（|x-30|≈4）からこの距離だけ外側までを「土寄り」として滑らかに薄める。
@@ -74,17 +73,6 @@ export class Terrain {
     const material = this.buildGroundMaterial(theme);
     this.mesh = new THREE.Mesh(geometry, material);
     this.mesh.receiveShadow = true;
-
-    const riverGeometry = new THREE.PlaneGeometry(RIVER_SURFACE_WIDTH, Terrain.SIZE);
-    riverGeometry.rotateX(-Math.PI / 2);
-    const riverMaterial = new THREE.MeshStandardMaterial({
-      color: 0x4a7a8c,
-      transparent: true,
-      opacity: 0.8,
-    });
-    const riverMesh = new THREE.Mesh(riverGeometry, riverMaterial);
-    riverMesh.position.set(RIVER_X, Terrain.WATER_LEVEL, 0);
-    this.mesh.add(riverMesh);
   }
 
   /**

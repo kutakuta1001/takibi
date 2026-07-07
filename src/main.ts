@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { Engine } from './core/Engine';
 import { Input } from './core/Input';
 import { PlayerController } from './core/PlayerController';
@@ -5,8 +6,10 @@ import { Title } from './ui/Title';
 import { HUD } from './ui/HUD';
 import { Terrain } from './world/Terrain';
 import { Forest } from './world/Forest';
+import { River } from './world/River';
 import { Sky } from './world/Sky';
 import { ForestTheme } from './theme/ForestTheme';
+import type { Theme } from './theme/Theme';
 import { AudioEngine } from './audio/AudioEngine';
 import { createWind, createRiver, createBirds, createInsects } from './audio/synths';
 import { GameState } from './systems/GameState';
@@ -18,6 +21,39 @@ import { Cooking } from './systems/Cooking';
 
 const RIVER_GAIN_MAX_DISTANCE = 40;
 const RIVER_GAIN_MAX = 0.6;
+const ENV_MAP_INTENSITY_LOG2 = 0.04; // PMREMGenerator.fromScene の sigma（ぼかし量）
+
+/**
+ * 水面などのフレネル的な照り返し用に、空の色グラデーションだけの簡易シーンを
+ * PMREMGenerator で環境マップへ焼き込む（Sky.ts のシェーダそのものは使わず、
+ * 昼の空色を近似した静的環境。時間帯ごとの再生成は行わない簡略化）。
+ */
+function buildSkyEnvironment(renderer: THREE.WebGLRenderer, theme: Theme): THREE.Texture {
+  const envScene = new THREE.Scene();
+  const geometry = new THREE.SphereGeometry(1, 32, 16);
+  const position = geometry.attributes.position;
+  const colors = new Float32Array(position.count * 3);
+  const top = new THREE.Color(theme.sky.dayTop);
+  const bottom = new THREE.Color(theme.sky.dayBottom);
+  const mixed = new THREE.Color();
+  for (let i = 0; i < position.count; i++) {
+    const t = THREE.MathUtils.clamp(position.getY(i) * 0.5 + 0.5, 0, 1);
+    mixed.copy(bottom).lerp(top, t);
+    colors[i * 3] = mixed.r;
+    colors[i * 3 + 1] = mixed.g;
+    colors[i * 3 + 2] = mixed.b;
+  }
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  const material = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide });
+  envScene.add(new THREE.Mesh(geometry, material));
+
+  const pmremGenerator = new THREE.PMREMGenerator(renderer);
+  const renderTarget = pmremGenerator.fromScene(envScene, ENV_MAP_INTENSITY_LOG2);
+  pmremGenerator.dispose();
+  geometry.dispose();
+  material.dispose();
+  return renderTarget.texture;
+}
 
 // テーマの切替点。雪山対応時はここを SnowTheme に変更するだけでよい。
 const theme = ForestTheme;
@@ -34,11 +70,15 @@ if (placeholderGround) {
   engine.scene.remove(placeholderGround);
 }
 
+engine.scene.environment = buildSkyEnvironment(engine.renderer, theme);
+
 const terrain = new Terrain(theme);
 engine.scene.add(terrain.mesh);
 
 const forest = new Forest(theme, terrain);
 engine.scene.add(forest.group);
+
+const riverVisual = new River(engine.scene, terrain);
 
 const sky = new Sky(engine.scene, theme);
 
@@ -93,6 +133,7 @@ engine.onUpdate((dt) => {
   chopping.update(dt);
   fire.update(dt, playerController.position);
   cooking.update(dt);
+  riverVisual.update(dt);
 
   const distanceToRiver = Math.abs(playerController.position.x - Terrain.RIVER_X);
   const riverGain = Math.min(Math.max(1 - distanceToRiver / RIVER_GAIN_MAX_DISTANCE, 0), 1) * RIVER_GAIN_MAX;

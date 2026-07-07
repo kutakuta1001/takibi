@@ -32,6 +32,7 @@ const LIGHT_FUEL_INTENSITY = 6;
 const LIGHT_FLICKER_AMOUNT = 0.3;
 const LIGHT_DISTANCE = 22;
 const LIGHT_HEIGHT = 0.6;
+const NIGHT_LIGHT_BOOST = 1.3; // 夜(dayness=0)は火の光の存在感を1.3倍に強める
 
 const SPARK_COUNT = 60;
 const SPARK_BASE_RATE = 10;
@@ -160,11 +161,12 @@ export class Fire {
     this.sparkPoints.visible = visible;
   }
 
-  update(dt: number): void {
+  /** dayness: 1=夕(Grading未適用時のデフォルト)、0=夜。夜は焚き火の光の存在感を少し強める。 */
+  update(dt: number, dayness = 1): void {
     this.time += dt;
     const intensity = this.gs.fireIntensity;
 
-    this.updateLight(intensity);
+    this.updateLight(intensity, dayness);
     this.updateFlame(intensity);
     this.updateSparks(dt, intensity);
     this.glowDecalMaterial.opacity = intensity * DECAL_GLOW_MAX_OPACITY;
@@ -292,9 +294,10 @@ export class Fire {
     return new THREE.Points(geometry, material);
   }
 
-  private updateLight(intensity: number): void {
+  private updateLight(intensity: number, dayness: number): void {
     const flicker = Math.sin(this.time * 13) * LIGHT_FLICKER_AMOUNT;
-    this.light.intensity = Math.max(0, LIGHT_BASE_INTENSITY + intensity * LIGHT_FUEL_INTENSITY + flicker);
+    const nightBoost = THREE.MathUtils.lerp(NIGHT_LIGHT_BOOST, 1, dayness); // 夜は火の光の存在感を強める
+    this.light.intensity = Math.max(0, (LIGHT_BASE_INTENSITY + intensity * LIGHT_FUEL_INTENSITY) * nightBoost + flicker);
   }
 
   private updateFlame(intensity: number): void {

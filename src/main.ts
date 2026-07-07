@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import Alea from 'alea';
 import { Engine } from './core/Engine';
 import { Input } from './core/Input';
 import { Title } from './ui/Title';
@@ -6,6 +7,7 @@ import { HUD } from './ui/HUD';
 import { PanoScene } from './pano/PanoScene';
 import { LookControls } from './pano/LookControls';
 import { SpotManager, type Spot } from './pano/SpotManager';
+import { Grading } from './pano/Grading';
 import { GameState } from './systems/GameState';
 import { Interaction } from './systems/Interaction';
 import { Chopping } from './foreground/Chopping';
@@ -13,6 +15,35 @@ import { Fire } from './foreground/Fire';
 import { Cooking } from './foreground/Cooking';
 import { AudioEngine } from './audio/AudioEngine';
 import { createWind, createRiver, createBirds, createInsects } from './audio/synths';
+
+const STAR_COUNT = 800;
+const STAR_RADIUS = 45; // パノラマ球（半径50）の内側
+const STAR_HIDE_DAYNESS = 0.25; // これ以上明るい間（夕方側）は星を完全非表示にする
+
+/** 夜空の星（v1 world/Sky.ts の buildStarPositions を移植）。上半球のみに均等分布させる。 */
+function buildStarField(): THREE.Points {
+  const positions = new Float32Array(STAR_COUNT * 3);
+  const rand = Alea('takibi-stars');
+  for (let i = 0; i < STAR_COUNT; i++) {
+    const theta = rand() * Math.PI * 2;
+    const phi = Math.acos(2 * rand() - 1);
+    positions[i * 3] = STAR_RADIUS * Math.sin(phi) * Math.cos(theta);
+    positions[i * 3 + 1] = Math.abs(STAR_RADIUS * Math.cos(phi));
+    positions[i * 3 + 2] = STAR_RADIUS * Math.sin(phi) * Math.sin(theta);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const material = new THREE.PointsMaterial({
+    color: 0xffffff,
+    size: 1.5,
+    sizeAttenuation: false,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    toneMapped: false,
+  });
+  return new THREE.Points(geometry, material);
+}
 
 // campsite パノラマ内の実際の木の方向（yaw/pitch）。プレイテストで見た目に合わせて調整済み。
 const TREE_DIRECTION = { yaw: 0.5, pitch: -0.05 };
@@ -37,12 +68,12 @@ const SPOTS: Spot[] = [
   {
     id: 'campsite',
     panoUrl: '/panos/campsite.jpg',
-    audioMix: { wind: 0.3, river: 0.08, birds: true, insects: false },
+    audioMix: { wind: 0.3, river: 0.08, birds: true, insects: true },
   },
   {
     id: 'riverside',
     panoUrl: '/panos/riverside.jpg',
-    audioMix: { wind: 0.15, river: 0.55, birds: false, insects: false },
+    audioMix: { wind: 0.15, river: 0.55, birds: false, insects: true },
   },
 ];
 
@@ -109,13 +140,16 @@ birds.output.connect(audio.master);
 const insects = createInsects(audio.ctx);
 insects.output.connect(audio.master);
 
-/** createBirds/createInsects の setIntensity は連続値（P6 で dayness を渡す想定）だが、
- * P2 時点では Spot.audioMix の固定 boolean をそれぞれの閾値の内外にマップして on/off だけ反映する。 */
-function applyAudioMix(spot: Spot): void {
+/**
+ * wind/river はスポット固定のミックス、birds/insects は「そのスポットで鳴き得るか
+ * （Spot.audioMix の boolean）」と「今何時か（Grading.dayness）」を組み合わせて毎フレーム決める
+ * （鳥は夕方側 dayness>0.4、虫は夜側 dayness<0.3 で createBirds/createInsects の閾値と噛み合う）。
+ */
+function applyAmbientAudio(spot: Spot, dayness: number): void {
   wind.setIntensity(spot.audioMix.wind);
   river.setIntensity(spot.audioMix.river);
-  birds.setIntensity(spot.audioMix.birds ? 1 : 0);
-  insects.setIntensity(spot.audioMix.insects ? 0 : 1);
+  birds.setIntensity(spot.audioMix.birds ? dayness : 0);
+  insects.setIntensity(spot.audioMix.insects ? dayness : 1);
 }
 
 const gs = new GameState();
@@ -173,15 +207,17 @@ function updateHotspotsForSpot(spotId: Spot['id']): void {
 }
 updateHotspotsForSpot(SPOTS[0].id);
 
+const grading = new Grading();
+const stars = buildStarField();
+engine.scene.add(stars);
+
 const spotManager = new SpotManager(SPOTS, (spot) => {
   for (const [id, pano] of panoScenes) {
     pano.mesh.visible = id === spot.id;
   }
-  applyAudioMix(spot);
   updateHotspotsForSpot(spot.id);
   updateSpotButton();
 });
-applyAudioMix(SPOTS[0]);
 
 // 画面端の「川辺へ →」誘導ボタン。ui/HUD.ts は無改修のまま、専用の要素を #ui-root に直接追加する。
 const spotButton = document.createElement('button');
@@ -224,9 +260,24 @@ engine.onUpdate((dt) => {
   lookControls.enabled = !spotManager.busy && !cooking.isSitting;
   lookControls.update(dt);
   chopping.update(dt);
-  fire.update(dt);
-  cooking.update(dt);
   gs.tick(dt);
+
+  grading.update(dt);
+  const dayness = grading.dayness;
+  for (const pano of panoScenes.values()) {
+    pano.setGrading(dayness);
+  }
+  fire.update(dt, dayness);
+  cooking.update(dt);
+
+  const starVisible = dayness < STAR_HIDE_DAYNESS;
+  stars.visible = starVisible;
+  (stars.material as THREE.PointsMaterial).opacity = starVisible
+    ? THREE.MathUtils.clamp(1 - dayness / STAR_HIDE_DAYNESS, 0, 1)
+    : 0;
+
+  const currentSpot = SPOTS.find((s) => s.id === spotManager.current) ?? SPOTS[0];
+  applyAmbientAudio(currentSpot, dayness);
 
   fadeOverlay.style.opacity = String(spotManager.fadeOpacity);
   spotButton.style.visibility = spotManager.busy || cooking.isSitting ? 'hidden' : 'visible';

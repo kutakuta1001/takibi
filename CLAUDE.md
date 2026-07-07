@@ -16,8 +16,10 @@
 
 - Vanilla Three.js + TypeScript + Vite。React・物理エンジン・ポストプロセスは導入しない
 - dependencies は three / simplex-noise / alea のみ。追加は CEO 承認必須
-- 外部3Dアセット・音声ファイルは使わない（手続き生成・手続き合成）。品質不足で CC0 素材に
-  切り替えたい場合は CEO に提案してから
+- ジオメトリは手続き生成を維持。質感は CC0 写真テクスチャ（Poly Haven / ambientCG、
+  `public/textures/` に保存・`ATTRIBUTION.md` に出典記録）を使用可（2026-07-07 CEO 承認）。
+  GLTF 等の外部3Dモデルは導入しない（テクスチャ強化の評価後に CEO が判断）。
+  音は手続き合成のまま。CC0 音源に切り替えたい場合は CEO に提案してから
 - ワールド生成は seed 固定（alea('takibi')）で決定的に
 - GameState.ts は Three.js 非依存を厳守（単体テスト対象）
 - 色・霧・木などの環境パラメータは必ず Theme 経由（`src/theme/`）。雪山対応の生命線

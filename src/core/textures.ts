@@ -21,7 +21,14 @@ const WATER_NORMAL_STRENGTH = 1.6;
 const loader = new THREE.TextureLoader();
 let cachedWaterNormal: THREE.Texture | null = null;
 
+// Vitest（Node環境・document未定義）から Terrain 等を直接 new すると TextureLoader が
+// createElementNS で落ちるため、ブラウザ以外では空テクスチャを返して構築だけ通す
+// （実行時は Vite が常にブラウザで動くため本番挙動に影響しない）。
+const isBrowser = typeof document !== 'undefined';
+
 function loadTexture(url: string, repeat: number, colorSpace?: THREE.ColorSpace): THREE.Texture {
+  if (!isBrowser) return new THREE.Texture();
+
   const texture = loader.load(url);
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
@@ -50,6 +57,7 @@ export function loadPBR(name: 'grass' | 'ground' | 'bark' | 'rock', repeat: numb
  */
 export function loadWaterNormal(): THREE.Texture {
   if (cachedWaterNormal) return cachedWaterNormal;
+  if (!isBrowser) return new THREE.Texture();
 
   const size = WATER_NORMAL_SIZE;
   const canvas = document.createElement('canvas');

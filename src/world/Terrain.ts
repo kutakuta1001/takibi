@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { createNoise2D } from 'simplex-noise';
 import Alea from 'alea';
+import type { Theme } from '../theme/Theme';
+import { ForestTheme } from '../theme/ForestTheme';
 
 const RIVER_X = 30;
 const RIVER_CARVE_HALF_WIDTH = 6;
@@ -28,7 +30,7 @@ export class Terrain {
   readonly mesh: THREE.Mesh;
   private readonly noise2D: Noise2D;
 
-  constructor(groundColor: number = 0x4a5d3a) {
+  constructor(theme: Theme = ForestTheme) {
     this.noise2D = createNoise2D(Alea('takibi'));
 
     const geometry = new THREE.PlaneGeometry(Terrain.SIZE, Terrain.SIZE, SEGMENTS, SEGMENTS);
@@ -44,7 +46,7 @@ export class Terrain {
     geometry.rotateX(-Math.PI / 2);
     geometry.computeBoundingSphere();
 
-    const material = new THREE.MeshStandardMaterial({ color: groundColor });
+    const material = new THREE.MeshStandardMaterial({ color: theme.ground.color });
     this.mesh = new THREE.Mesh(geometry, material);
 
     const riverGeometry = new THREE.PlaneGeometry(RIVER_SURFACE_WIDTH, Terrain.SIZE);

@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import type { Theme } from '../theme/Theme';
+import { ForestTheme } from '../theme/ForestTheme';
 
 const DT_MAX = 0.1;
 
@@ -10,9 +12,9 @@ export class Engine {
   private readonly clock: THREE.Clock;
   private readonly updateCallbacks: Array<(dt: number) => void> = [];
 
-  constructor(container: HTMLElement) {
+  constructor(container: HTMLElement, theme: Theme = ForestTheme) {
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.FogExp2(0xcfd8dc, 0.02);
+    this.scene.fog = new THREE.FogExp2(theme.fog.color, theme.fog.density);
 
     this.camera = new THREE.PerspectiveCamera(
       75,
@@ -31,7 +33,7 @@ export class Engine {
     this.scene.add(hemiLight);
 
     const groundGeometry = new THREE.PlaneGeometry(200, 200);
-    const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x4a5d3a });
+    const groundMaterial = new THREE.MeshStandardMaterial({ color: theme.ground.color });
     const ground = new THREE.Mesh(groundGeometry, groundMaterial);
     ground.rotation.x = -Math.PI / 2;
     ground.name = 'placeholder-ground';

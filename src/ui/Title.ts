@@ -8,7 +8,7 @@ export class Title {
     }
   };
 
-  constructor(onStart: () => void) {
+  constructor(onStart: () => void, onUnlock?: () => void) {
     this.onStart = onStart;
 
     this.element = document.createElement('div');
@@ -26,6 +26,7 @@ export class Title {
     this.element.textContent = 'Takibi — クリックではじめる';
 
     this.element.addEventListener('click', () => {
+      onUnlock?.();
       document.body.requestPointerLock();
     });
 

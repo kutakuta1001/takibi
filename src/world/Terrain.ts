@@ -26,6 +26,7 @@ function terrainHeight(noise2D: Noise2D, x: number, z: number): number {
 export class Terrain {
   static readonly SIZE = 200;
   static readonly WATER_LEVEL = -1.2;
+  static readonly RIVER_X = RIVER_X;
 
   readonly mesh: THREE.Mesh;
   private readonly noise2D: Noise2D;

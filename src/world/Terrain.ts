@@ -17,6 +17,11 @@ const BANK_BLEND_INNER = 4;
 const BLEND_NOISE_WEIGHT = 0.35; // 川から離れた場所でも noise で薄く土のパッチを混ぜる強さ
 const MACRO_SCALE = 1 / 7; // タイリング対策のマクロバリエーション用の再サンプル縮小率
 const MACRO_MIX = 0.4; // マクロバリエーションの適用強度（0=無効、1=全面適用）
+// roughnessMap の暗い（低roughness）部分は、太陽やPointLightが浅い角度で当たると強い鏡面
+// ハイライトになり、草地に白いキラキラの点々が浮く（grazing-angle specular sparkle）。
+// roughness に下限を設けて鏡面反射の鋭さを抑える。
+const GROUND_ROUGHNESS_MIN = 0.7;
+const GROUND_NORMAL_SCALE = 0.45; // 法線マップの起伏を弱め、キラキラの元になる急峻な法線変化を抑える
 
 type Noise2D = (x: number, y: number) => number;
 
@@ -94,6 +99,7 @@ export class Terrain {
     const material = new THREE.MeshStandardMaterial({
       map: primary.map,
       normalMap: primary.normalMap,
+      normalScale: new THREE.Vector2(GROUND_NORMAL_SCALE, GROUND_NORMAL_SCALE),
       roughnessMap: primary.roughnessMap,
       metalness: 0,
     });
@@ -138,6 +144,7 @@ float roughnessFactor = roughness;
   vec4 texelRoughnessB = texture2D( roughnessMap2, vRoughnessMapUv );
   roughnessFactor *= mix( texelRoughnessA.g, texelRoughnessB.g, vBlend );
 #endif
+roughnessFactor = max( roughnessFactor, ${GROUND_ROUGHNESS_MIN.toFixed(2)} );
 `
         )
         .replace(

@@ -1,13 +1,20 @@
 import * as THREE from 'three';
+import Alea from 'alea';
 import type { AudioEngine } from '../audio/AudioEngine';
 import { createFireCrackle, type Synth } from '../audio/synths';
+import { loadPBR } from '../core/textures';
 import type { GameState } from './GameState';
 import type { Interactable } from './Interaction';
 
 const STONE_COUNT = 8;
 const STONE_RING_RADIUS = 0.75;
 const STONE_RADIUS = 0.22;
-const STONE_COLOR = 0x777268;
+const STONE_COLOR = 0x8a8478; // rock テクスチャに乗せるトーン（落ち着いたグレー、白い卵状に見えないようにする）
+const STONE_RING_JITTER = 0.12; // 輪の等間隔感を消すための半径ばらつき
+const STONE_SCALE_MIN = 0.75;
+const STONE_SCALE_MAX = 1.15;
+const STONE_FLATTEN_MIN = 0.4; // 扁平度（Y方向スケール）の下限
+const STONE_FLATTEN_MAX = 0.65; // 扁平度（Y方向スケール）の上限
 
 const LOG_COUNT = 5;
 const LOG_LENGTH = 1.1;
@@ -136,12 +143,29 @@ export class Fire {
 
   private buildStoneRing(): void {
     const geometry = new THREE.SphereGeometry(STONE_RADIUS, 8, 6);
-    const material = new THREE.MeshStandardMaterial({ color: STONE_COLOR });
+    const rock = loadPBR('rock', 1);
+    const material = new THREE.MeshStandardMaterial({
+      map: rock.map,
+      normalMap: rock.normalMap,
+      roughnessMap: rock.roughnessMap,
+      color: STONE_COLOR,
+      metalness: 0,
+    });
+
+    const rand = Alea('takibi-fire-stones');
     for (let i = 0; i < STONE_COUNT; i++) {
       const angle = (i / STONE_COUNT) * Math.PI * 2;
+      const radius = STONE_RING_RADIUS + (rand() - 0.5) * STONE_RING_JITTER;
+      const flatten = STONE_FLATTEN_MIN + rand() * (STONE_FLATTEN_MAX - STONE_FLATTEN_MIN);
+      const scaleXZ = STONE_SCALE_MIN + rand() * (STONE_SCALE_MAX - STONE_SCALE_MIN);
+
       const stone = new THREE.Mesh(geometry, material);
-      stone.position.set(Math.cos(angle) * STONE_RING_RADIUS, STONE_RADIUS * 0.6, Math.sin(angle) * STONE_RING_RADIUS);
-      stone.scale.y = 0.7;
+      stone.position.set(Math.cos(angle) * radius, STONE_RADIUS * flatten * 0.9, Math.sin(angle) * radius);
+      stone.rotation.y = rand() * Math.PI * 2;
+      stone.rotation.x = (rand() - 0.5) * 0.3;
+      stone.scale.set(scaleXZ, flatten, scaleXZ * (0.85 + rand() * 0.3));
+      stone.castShadow = true;
+      stone.receiveShadow = true;
       this.group.add(stone);
     }
   }

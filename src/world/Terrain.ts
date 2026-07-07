@@ -49,6 +49,7 @@ export class Terrain {
 
     const material = new THREE.MeshStandardMaterial({ color: theme.ground.color });
     this.mesh = new THREE.Mesh(geometry, material);
+    this.mesh.receiveShadow = true;
 
     const riverGeometry = new THREE.PlaneGeometry(RIVER_SURFACE_WIDTH, Terrain.SIZE);
     riverGeometry.rotateX(-Math.PI / 2);

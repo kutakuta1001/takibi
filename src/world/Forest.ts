@@ -78,9 +78,12 @@ function buildTreeGroup(materials: TreeMaterials): THREE.Group {
     materials.trunk
   );
   trunk.position.y = TRUNK_HEIGHT / 2;
+  trunk.castShadow = true;
   group.add(trunk);
 
   const leaves = new THREE.Mesh(buildLayeredLeafGeometry(), materials.leaf);
+  leaves.castShadow = true;
+  leaves.receiveShadow = true;
   group.add(leaves);
 
   return group;
@@ -141,6 +144,10 @@ export class Forest {
 
     trunkMesh.instanceMatrix.needsUpdate = true;
     leafMesh.instanceMatrix.needsUpdate = true;
+
+    trunkMesh.castShadow = true;
+    leafMesh.castShadow = true;
+    leafMesh.receiveShadow = true;
 
     group.add(trunkMesh, leafMesh);
     return group;

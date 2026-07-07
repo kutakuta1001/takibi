@@ -88,7 +88,7 @@ interaction.add(cooking.fireKettleInteractable);
 
 engine.onUpdate((dt) => {
   playerController.update(dt);
-  sky.update(dt);
+  sky.update(dt, playerController.position);
   gs.tick(dt);
   chopping.update(dt);
   fire.update(dt, playerController.position);

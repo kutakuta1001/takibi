@@ -12,6 +12,14 @@ const SUN_INTENSITY_NIGHT = 0.05;
 const MOON_COLOR = 0x8899bb;
 const MOON_INTENSITY_MAX = 0.15;
 
+const SUN_SHADOW_MAP_SIZE = 2048;
+const SUN_SHADOW_HALF_EXTENT = 40; // 正方影範囲: プレイヤー中心 ±40m
+const SUN_SHADOW_NEAR = 1;
+const SUN_SHADOW_FAR = SUN_DISTANCE * 2;
+const SUN_SHADOW_BIAS = -0.0005;
+
+const ZERO = new THREE.Vector3(0, 0, 0);
+
 const SKY_VERTEX_SHADER = `
   varying vec3 vWorldPosition;
   void main() {
@@ -74,7 +82,17 @@ export class Sky {
     this.fogNight = new THREE.Color(theme.sky.nightBottom);
 
     this.sunLight = new THREE.DirectionalLight(0xffffff, SUN_INTENSITY_DAY);
+    this.sunLight.castShadow = true;
+    this.sunLight.shadow.mapSize.set(SUN_SHADOW_MAP_SIZE, SUN_SHADOW_MAP_SIZE);
+    this.sunLight.shadow.camera.left = -SUN_SHADOW_HALF_EXTENT;
+    this.sunLight.shadow.camera.right = SUN_SHADOW_HALF_EXTENT;
+    this.sunLight.shadow.camera.top = SUN_SHADOW_HALF_EXTENT;
+    this.sunLight.shadow.camera.bottom = -SUN_SHADOW_HALF_EXTENT;
+    this.sunLight.shadow.camera.near = SUN_SHADOW_NEAR;
+    this.sunLight.shadow.camera.far = SUN_SHADOW_FAR;
+    this.sunLight.shadow.bias = SUN_SHADOW_BIAS;
     scene.add(this.sunLight);
+    scene.add(this.sunLight.target);
 
     this.moonLight = new THREE.DirectionalLight(MOON_COLOR, 0);
     scene.add(this.moonLight);
@@ -107,16 +125,17 @@ export class Sky {
     this.stars = new THREE.Points(starsGeometry, starsMaterial);
     scene.add(this.stars);
 
-    this.applyTimeOfDay();
+    this.applyTimeOfDay(ZERO);
   }
 
   get dayness(): number {
     return this.computeDayness(this.timeOfDay);
   }
 
-  update(dt: number): void {
+  /** playerPos: 太陽の影範囲（shadow.camera）をプレイヤー周辺に追従させるための中心点。 */
+  update(dt: number, playerPos: THREE.Vector3 = ZERO): void {
     this.timeOfDay = (this.timeOfDay + dt / CYCLE_SECONDS) % 1;
-    this.applyTimeOfDay();
+    this.applyTimeOfDay(playerPos);
   }
 
   private computeDayness(timeOfDay: number): number {
@@ -125,19 +144,23 @@ export class Sky {
     return (elevation + 1) / 2;
   }
 
-  private applyTimeOfDay(): void {
+  private applyTimeOfDay(playerPos: THREE.Vector3): void {
     const sunAngle = this.timeOfDay * Math.PI * 2;
     const elevation = -Math.cos(sunAngle);
     const dayness = (elevation + 1) / 2;
 
-    this.sunLight.position.set(
-      Math.cos(sunAngle) * SUN_DISTANCE,
-      elevation * SUN_DISTANCE,
-      Math.sin(sunAngle) * SUN_DISTANCE * 0.6
-    );
+    const sunDirX = Math.cos(sunAngle) * SUN_DISTANCE;
+    const sunDirY = elevation * SUN_DISTANCE;
+    const sunDirZ = Math.sin(sunAngle) * SUN_DISTANCE * 0.6;
+
+    // 影範囲（shadow.camera）をプレイヤー中心に保つため、位置はプレイヤー基準のオフセットにする。
+    // 方向自体（sunDir*）はプレイヤー位置に依存しないので、月側は従来どおり原点基準のまま。
+    this.sunLight.position.set(playerPos.x + sunDirX, sunDirY, playerPos.z + sunDirZ);
+    this.sunLight.target.position.copy(playerPos);
+    this.sunLight.target.updateMatrixWorld();
     this.sunLight.intensity = THREE.MathUtils.lerp(SUN_INTENSITY_NIGHT, SUN_INTENSITY_DAY, dayness);
 
-    this.moonLight.position.copy(this.sunLight.position).multiplyScalar(-1);
+    this.moonLight.position.set(-sunDirX, -sunDirY, -sunDirZ);
     this.moonLight.intensity = MOON_INTENSITY_MAX * (1 - dayness);
 
     const topUniform = this.skyMaterial.uniforms.topColor.value as THREE.Color;

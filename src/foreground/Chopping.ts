@@ -78,14 +78,14 @@ export class Chopping {
 
     const handle = new THREE.Mesh(
       new THREE.BoxGeometry(0.04, 0.5, 0.04),
-      new THREE.MeshStandardMaterial({ color: 0x5b4633 })
+      new THREE.MeshStandardMaterial({ color: 0x3d2b1a, roughness: 0.9, metalness: 0 })
     );
     handle.position.y = 0.25;
     group.add(handle);
 
     const head = new THREE.Mesh(
       new THREE.CylinderGeometry(0.12, 0.12, 0.06, 12),
-      new THREE.MeshStandardMaterial({ color: 0x9a9a9a })
+      new THREE.MeshStandardMaterial({ color: 0x5c5c60, roughness: 0.75, metalness: 0.55 })
     );
     head.rotation.x = Math.PI / 2;
     head.position.y = 0.5;

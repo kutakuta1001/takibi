@@ -16,10 +16,25 @@ const STONE_SCALE_MAX = 1.15;
 const STONE_FLATTEN_MIN = 0.4;
 const STONE_FLATTEN_MAX = 0.65;
 
-const LOG_COUNT = 5;
-const LOG_LENGTH = 1.1;
-const LOG_RADIUS = 0.08;
-const LOG_COLOR = 0x4a3527;
+const LOG_COUNT = 4;
+const LOG_LENGTH = 0.85;
+const LOG_RADIUS = 0.06;
+const LOG_INNER_GAP = 0.05; // 火に近い側の端が中心をわずかに越えて重なる量
+const LOG_GROUND_OFFSET = 0.05;
+const LOG_ANGLE_JITTER = 0.3; // rad。等間隔配置から少しずらして手積み感を出す
+const LOG_LENGTH_JITTER = 0.2; // ±10%
+const LOG_RADIUS_JITTER = 0.3; // ±15%
+const LOG_TILT_JITTER = 0.12; // rad。完全な水平から少し傾ける
+const LOG_BARK_TEXTURE_SIZE = 64;
+const LOG_CHARCOAL_COLOR = { r: 26, g: 20, b: 16 }; // 焦げた黒炭
+const LOG_EMBER_COLOR = { r: 168, g: 74, b: 24 }; // 熾火のオレンジ（火に近い側だけわずかに覗かせる）
+const LOG_EMBER_BAND = 0.28; // v(0=外側/地面側, 1=火に近い側)の上位28%だけ熾火色を混ぜる
+const LOG_BARK_GRAIN_FREQS: ReadonlyArray<{ freq: number; amplitude: number; phase: number }> = [
+  { freq: 5, amplitude: 0.5, phase: 0 },
+  { freq: 11, amplitude: 0.3, phase: 1.7 },
+  { freq: 17, amplitude: 0.2, phase: 3.1 },
+];
+const LOG_BARK_NORMAL_STRENGTH = 0.6;
 
 const FLAME_MIN_SCALE = 0.9;
 const FLAME_MAX_SCALE = 1.6;
@@ -92,6 +107,88 @@ function createGlowDecalTexture(): THREE.Texture {
     ctx.fillRect(0, 0, size, size);
   }
   return new THREE.CanvasTexture(canvas);
+}
+
+/**
+ * 薪の樹皮テクスチャ（色）。U方向（円周）は整数周波数のサイン合成で焦げた木目の縦筋を表現し
+ * キャンバス端でシームレスにタイリングする（loadWaterNormal と同じ手法）。V方向（長さ）は
+ * 0=外側(地面側)を焦げた黒炭、1=火に近い側の上位28%だけ熾火のオレンジをわずかに覗かせる。
+ */
+function createLogBarkTexture(): THREE.CanvasTexture {
+  const width = LOG_BARK_TEXTURE_SIZE;
+  const height = LOG_BARK_TEXTURE_SIZE * 2;
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    const imageData = ctx.createImageData(width, height);
+    const twoPi = Math.PI * 2;
+    for (let py = 0; py < height; py++) {
+      // CanvasTexture は flipY のためキャンバス上端(py=0)がv=1(火に近い側)に対応する。
+      const v = 1 - py / (height - 1);
+      const emberMix = Math.max(0, (v - (1 - LOG_EMBER_BAND)) / LOG_EMBER_BAND);
+      for (let px = 0; px < width; px++) {
+        const u = px / width;
+        let grain = 0;
+        for (const layer of LOG_BARK_GRAIN_FREQS) {
+          grain += Math.sin(u * twoPi * layer.freq + layer.phase) * layer.amplitude;
+        }
+        const shade = 1 + grain * 0.22;
+        const r = (LOG_CHARCOAL_COLOR.r + (LOG_EMBER_COLOR.r - LOG_CHARCOAL_COLOR.r) * emberMix) * shade;
+        const g = (LOG_CHARCOAL_COLOR.g + (LOG_EMBER_COLOR.g - LOG_CHARCOAL_COLOR.g) * emberMix) * shade;
+        const b = (LOG_CHARCOAL_COLOR.b + (LOG_EMBER_COLOR.b - LOG_CHARCOAL_COLOR.b) * emberMix) * shade;
+        const i = (py * width + px) * 4;
+        imageData.data[i] = Math.min(255, Math.max(0, r));
+        imageData.data[i + 1] = Math.min(255, Math.max(0, g));
+        imageData.data[i + 2] = Math.min(255, Math.max(0, b));
+        imageData.data[i + 3] = 255;
+      }
+    }
+    ctx.putImageData(imageData, 0, 0);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+/**
+ * 薪の樹皮ノーマルマップ。上のcolorテクスチャと同じU方向サイン合成の高さ場から解析的に
+ * 勾配(dH/du)を求めてエンコードする（v方向は起伏なしのため dH/dv=0、loadWaterNormal と同じ手法）。
+ * 縦筋の凹凸に焚き火の光を当てて樹皮らしい陰影を出す。
+ */
+function createLogBarkNormalTexture(): THREE.CanvasTexture {
+  const size = LOG_BARK_TEXTURE_SIZE;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    const imageData = ctx.createImageData(size, size);
+    const twoPi = Math.PI * 2;
+    for (let py = 0; py < size; py++) {
+      for (let px = 0; px < size; px++) {
+        const u = px / size;
+        let dHdu = 0;
+        for (const layer of LOG_BARK_GRAIN_FREQS) {
+          dHdu += Math.cos(u * twoPi * layer.freq + layer.phase) * layer.amplitude * layer.freq * twoPi;
+        }
+        const normal = new THREE.Vector3(-dHdu * LOG_BARK_NORMAL_STRENGTH, 0, 1).normalize();
+        const i = (py * size + px) * 4;
+        imageData.data[i] = Math.round((normal.x * 0.5 + 0.5) * 255);
+        imageData.data[i + 1] = Math.round((normal.y * 0.5 + 0.5) * 255);
+        imageData.data[i + 2] = Math.round((normal.z * 0.5 + 0.5) * 255);
+        imageData.data[i + 3] = 255;
+      }
+    }
+    ctx.putImageData(imageData, 0, 0);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.needsUpdate = true;
+  return texture;
 }
 
 /**
@@ -232,15 +329,38 @@ export class Fire {
     }
   }
 
+  /**
+   * 薪はcos/sin方向（火に近い側=v1端）に少しだけ中心を越えて重なり、外側（v0端・地面側）へ
+   * 張り出すよう位置をずらす（実際の焚き火の組み方に合わせ、中心を挟んで対称に貫通させない）。
+   * 本数・傾き・太さ・長さに個体差を持たせ、均等に並んだ「作り物」感を減らす。
+   */
   private buildLogPile(): void {
     const geometry = new THREE.CylinderGeometry(LOG_RADIUS, LOG_RADIUS, LOG_LENGTH, 8);
-    const material = new THREE.MeshStandardMaterial({ color: LOG_COLOR });
+    const material = new THREE.MeshStandardMaterial({
+      map: createLogBarkTexture(),
+      normalMap: createLogBarkNormalTexture(),
+      roughness: 0.95,
+      metalness: 0,
+    });
+
+    const rand = Alea('takibi-fire-logs');
     for (let i = 0; i < LOG_COUNT; i++) {
-      const angle = (i / LOG_COUNT) * Math.PI * 2;
+      const angle = (i / LOG_COUNT) * Math.PI * 2 + (rand() - 0.5) * LOG_ANGLE_JITTER;
+      const lengthScale = 1 + (rand() - 0.5) * LOG_LENGTH_JITTER;
+      const radiusScale = 1 + (rand() - 0.5) * LOG_RADIUS_JITTER;
+      const halfLength = (LOG_LENGTH * lengthScale) / 2;
+      const shift = halfLength - LOG_INNER_GAP;
+
       const log = new THREE.Mesh(geometry, material);
-      log.position.set(0, LOG_RADIUS + 0.05, 0);
+      log.position.set(
+        Math.cos(angle) * shift,
+        LOG_RADIUS * radiusScale + LOG_GROUND_OFFSET,
+        Math.sin(angle) * shift
+      );
       log.rotation.z = Math.PI / 2;
       log.rotation.y = angle;
+      log.rotation.x = (rand() - 0.5) * LOG_TILT_JITTER;
+      log.scale.set(radiusScale, lengthScale, radiusScale);
       this.group.add(log);
     }
   }

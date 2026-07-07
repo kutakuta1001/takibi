@@ -19,27 +19,50 @@ import { createWind, createRiver, createBirds, createInsects } from './audio/syn
 const STAR_COUNT = 800;
 const STAR_RADIUS = 45; // パノラマ球（半径50）の内側
 const STAR_HIDE_DAYNESS = 0.25; // これ以上明るい間（夕方側）は星を完全非表示にする
+// 仰角が低い領域は実写の木々の樹冠にあたるため、星をフェードして木の上に浮いて見えないようにする。
+const STAR_FADE_MIN_ELEVATION = THREE.MathUtils.degToRad(16); // これ未満は完全に隠す
+const STAR_FADE_FULL_ELEVATION = THREE.MathUtils.degToRad(34); // これ以上で完全に見える
 
-/** 夜空の星（v1 world/Sky.ts の buildStarPositions を移植）。上半球のみに均等分布させる。 */
+/**
+ * 夜空の星（v1 world/Sky.ts の buildStarPositions を移植）。上半球のみに均等分布させる。
+ * 各星の仰角から木々の樹冠に隠れるべき低仰角ほど暗くなるフェード係数を頂点カラーに焼き込み、
+ * AdditiveBlending で加算合成する（値0=無加算=見えない）ことで、シェーダーを書かずに
+ * 「空の高い領域だけ星が見える」馴染ませを実現する（Fire.ts の火の粉パーティクルと同じ手法）。
+ * campsite/riverside で樹冠の高さが異なるため厳密な写真ベースのマスクではないが、
+ * 低仰角の樹冠帯を一律にフェードすることで効果と実装コストのバランスを取った。
+ */
 function buildStarField(): THREE.Points {
   const positions = new Float32Array(STAR_COUNT * 3);
+  const colors = new Float32Array(STAR_COUNT * 3);
   const rand = Alea('takibi-stars');
   for (let i = 0; i < STAR_COUNT; i++) {
     const theta = rand() * Math.PI * 2;
     const phi = Math.acos(2 * rand() - 1);
-    positions[i * 3] = STAR_RADIUS * Math.sin(phi) * Math.cos(theta);
-    positions[i * 3 + 1] = Math.abs(STAR_RADIUS * Math.cos(phi));
-    positions[i * 3 + 2] = STAR_RADIUS * Math.sin(phi) * Math.sin(theta);
+    const x = STAR_RADIUS * Math.sin(phi) * Math.cos(theta);
+    const y = Math.abs(STAR_RADIUS * Math.cos(phi));
+    const z = STAR_RADIUS * Math.sin(phi) * Math.sin(theta);
+    positions[i * 3] = x;
+    positions[i * 3 + 1] = y;
+    positions[i * 3 + 2] = z;
+
+    const elevation = Math.asin(THREE.MathUtils.clamp(y / STAR_RADIUS, -1, 1));
+    const fade = THREE.MathUtils.smoothstep(elevation, STAR_FADE_MIN_ELEVATION, STAR_FADE_FULL_ELEVATION);
+    colors[i * 3] = fade;
+    colors[i * 3 + 1] = fade;
+    colors[i * 3 + 2] = fade;
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   const material = new THREE.PointsMaterial({
     color: 0xffffff,
+    vertexColors: true,
     size: 1.5,
     sizeAttenuation: false,
     transparent: true,
     opacity: 0,
     depthWrite: false,
+    blending: THREE.AdditiveBlending,
     toneMapped: false,
   });
   return new THREE.Points(geometry, material);

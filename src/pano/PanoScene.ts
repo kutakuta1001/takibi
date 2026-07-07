@@ -14,11 +14,12 @@ export class PanoScene {
   readonly mesh: THREE.Mesh;
   private readonly material: THREE.MeshBasicMaterial;
 
-  constructor(url: string) {
+  /** onLoad: 画像デコード完了時に呼ばれる（例: main.ts が scene.environment 用の PMREM を焼くタイミング）。 */
+  constructor(url: string, onLoad?: (texture: THREE.Texture) => void) {
     const geometry = new THREE.SphereGeometry(SPHERE_RADIUS, SPHERE_WIDTH_SEGMENTS, SPHERE_HEIGHT_SEGMENTS);
     geometry.scale(-1, 1, 1);
 
-    const texture = new THREE.TextureLoader().load(url);
+    const texture = new THREE.TextureLoader().load(url, onLoad);
     texture.colorSpace = THREE.SRGBColorSpace;
 
     this.material = new THREE.MeshBasicMaterial({ map: texture, toneMapped: false, fog: false });

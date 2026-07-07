@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { Engine } from './core/Engine';
 import { Input } from './core/Input';
 import { Title } from './ui/Title';
@@ -8,12 +9,17 @@ import { SpotManager, type Spot } from './pano/SpotManager';
 import { GameState } from './systems/GameState';
 import { Interaction } from './systems/Interaction';
 import { Chopping } from './foreground/Chopping';
+import { Fire } from './foreground/Fire';
 import { AudioEngine } from './audio/AudioEngine';
 import { createWind, createRiver, createBirds, createInsects } from './audio/synths';
 
 // campsite パノラマ内の実際の木の方向（yaw/pitch）。プレイテストで見た目に合わせて調整済み。
 const TREE_DIRECTION = { yaw: 0.5, pitch: -0.05 };
 const TREE_ANGULAR_RADIUS = 0.08; // rad（約4.6度）
+
+// 焚き火はカメラ（原点・目線高さ）から約2.5m先の地面。EYE_HEIGHTだけ下げて地面基準にする。
+const EYE_HEIGHT = 1.6;
+const FIRE_POSITION = new THREE.Vector3(0, -EYE_HEIGHT, -2.5);
 
 const SPOT_LABELS: Record<Spot['id'], string> = {
   campsite: 'キャンプ地',
@@ -65,9 +71,20 @@ engine.scene.add(engine.camera);
 
 // スポットごとに PanoScene を1つずつ用意し、可視状態の切替でクロスフェード先を表示する
 // （テクスチャの再読込を避けるため、遷移のたびに作り直さない）。
+const pmremGenerator = new THREE.PMREMGenerator(engine.renderer);
 const panoScenes = new Map<Spot['id'], PanoScene>();
 for (const spot of SPOTS) {
-  const pano = new PanoScene(spot.panoUrl);
+  const pano = new PanoScene(
+    spot.panoUrl,
+    spot.id === 'campsite'
+      ? (texture) => {
+          // 焚き火の石・薪等の前景3Dを実写の色に馴染ませるため、campsite写真そのものを
+          // 環境マップとして焼き込む（v1のような合成スカイシェーダは不要になった）。
+          engine.scene.environment = pmremGenerator.fromEquirectangular(texture).texture;
+          pmremGenerator.dispose();
+        }
+      : undefined
+  );
   pano.mesh.visible = spot.id === SPOTS[0].id;
   engine.scene.add(pano.mesh);
   panoScenes.set(spot.id, pano);
@@ -108,13 +125,16 @@ gs.on('kettle-changed', refreshInventory);
 refreshInventory();
 
 const chopping = new Chopping(engine.scene, engine.camera, audio, gs, TREE_DIRECTION, TREE_ANGULAR_RADIUS);
+const fire = new Fire(engine.scene, gs, audio, FIRE_POSITION);
 
-/** campsite にいる間だけ伐採ホットスポットを有効にする（riverside では同じ方向に木は無い）。 */
+/** campsite にいる間だけ伐採・焚き火のホットスポットを有効にする（riverside には無い）。 */
 function updateHotspotsForSpot(spotId: Spot['id']): void {
   if (spotId === 'campsite') {
     interaction.add(chopping.hotspot);
+    interaction.add(fire.interactable);
   } else {
     interaction.remove(chopping.hotspot);
+    interaction.remove(fire.interactable);
   }
 }
 updateHotspotsForSpot(SPOTS[0].id);
@@ -167,6 +187,7 @@ engine.onUpdate((dt) => {
   lookControls.enabled = !spotManager.busy;
   lookControls.update(dt);
   chopping.update(dt);
+  fire.update(dt);
   gs.tick(dt);
 
   fadeOverlay.style.opacity = String(spotManager.fadeOpacity);

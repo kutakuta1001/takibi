@@ -39,7 +39,9 @@ const LOG_BARK_NORMAL_STRENGTH = 0.6;
 const FLAME_MIN_SCALE = 0.9;
 const FLAME_MAX_SCALE = 1.6;
 const FLAME_VIDEO_ASPECT = 480 / 432;
-const FLAME_VIDEO_URL = '/fire/bonfire-loop.mp4';
+// 先頭スラッシュなしの相対パス。サブパス配信（GitHub Pages 等）でも解決できるよう
+// panos と同じ方式に揃えている。
+const FLAME_VIDEO_URL = 'fire/bonfire-loop.mp4';
 
 const LIGHT_COLOR = 0xff8844;
 const LIGHT_BASE_INTENSITY = 2;

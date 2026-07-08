@@ -6,12 +6,14 @@
 
 ## campsite.jpg
 
-- 元アセット: [J&E Gray 02](https://polyhaven.com/a/je_gray_02)（Poly Haven ID: `je_gray_02`）
-- 作者: Greg Zaal
+- 元アセット: [Forest Slope](https://polyhaven.com/a/forest_slope)（Poly Haven ID: `forest_slope`）
+- 作者: Andreas Mischok
 - ライセンス: CC0
-- 選定理由: 開けた草地で焚き火を置ける地面があり、視線の高さが人の立ち位置に近い。
-  低い角度の強い日差しと長い影がゴールデンアワーの雰囲気に合う。
-  campsite スポットのベース写真として採用（夕⇔夜グレーディングのベースは本画像の色調）
+- 選定理由（Phase S・2026-07-08差し替え）: CEO指摘「公園に見える・建物が写っている」を受けて
+  je_gray_02 から差し替え。鬱蒼とした針葉樹の古木・苔むした岩・人工物ゼロで「隔絶された、
+  探検の到達点」に見える。木々の間の開けた地面（もとは踏み跡状の空間だが舗装・標識等の
+  人工物はなし）が焚き火を置ける平地として使える。campsite スポットのベース写真として採用
+  （夕⇔夜グレーディングのベースは本画像の色調）
 
 ## riverside.jpg
 
@@ -23,15 +25,18 @@
 
 ## サイズ
 
-- campsite.jpg: 約5.2MB
+- campsite.jpg: 約4.3MB
 - riverside.jpg: 約3.9MB
-- 合計: 約9.1MB（予算30MB以内）
+- 合計: 約8.2MB（予算35MB以内）
 
 ## 比較検討したが採用しなかった候補
 
-- forest_grove / sunset_forest / nature_reserve_forest / dark_autumn_forest / autumn_forest_04
-  （campsite候補。je_gray_02 ほど開けた地面と明確なゴールデンな低い日差しがなかったため見送り）
-- stream / river_rocks / xanderklinge / monbachtal_riverbank / whipple_creek_gazebo
-  （riverside候補。river_rocks は水面が写っておらず、whipple_creek_gazebo も水面が確認できなかった。
-  xanderklinge / monbachtal_riverbank は滝つき渓流で見た目は良いが、mossy_forest の方が
-  水面までの距離が近く「水汲み」の絵として自然だったため見送り）
+- campsite（Phase S・forest_slope採用時の比較）: niederwihl_forest（伐採した薪の山が写り込み
+  管理された林に見える）/ felsenlabyrinth・phalzer_forest_01（岩塊は迫力があるが焚き火を置ける
+  平地が乏しい）/ misty_pines（霧で視界が煙り情景が伝わりにくい）/ herkulessaulen（岩壁主体で
+  森の地面が写らない）/ gum_trees（疎林で公園的に見える）/ shady_patch・green_sanctuary
+  （手入れされた公園・庭園に見え、CEOの指摘した「公園に見える」問題を再現するため不採用）
+- campsite（Phase P・je_gray_02採用時の比較。参考）: forest_grove / sunset_forest /
+  nature_reserve_forest / dark_autumn_forest / autumn_forest_04
+- riverside（Phase P・mossy_forest採用時の比較。参考）: stream / river_rocks / xanderklinge /
+  monbachtal_riverbank / whipple_creek_gazebo

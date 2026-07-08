@@ -68,8 +68,9 @@ function buildStarField(): THREE.Points {
   return new THREE.Points(geometry, material);
 }
 
-// campsite パノラマ内の実際の木の方向（yaw/pitch）。プレイテストで見た目に合わせて調整済み。
-const TREE_DIRECTION = { yaw: 0.5, pitch: -0.05 };
+// campsite パノラマ内の実際の木の方向（yaw/pitch）。Phase S で forest_slope に差し替えた際、
+// 太い一本の木の幹が視界正面やや左に来る向きへプレイテストで再調整済み。
+const TREE_DIRECTION = { yaw: -0.33, pitch: -0.08 };
 const TREE_ANGULAR_RADIUS = 0.08; // rad（約4.6度）
 
 // 焚き火はカメラ（原点・目線高さ）から約2.5m先の地面。EYE_HEIGHTだけ下げて地面基準にする。

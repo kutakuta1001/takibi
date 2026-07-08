@@ -3,8 +3,27 @@ import { SpotManager, type Spot } from '../src/pano/SpotManager';
 
 function makeSpots(): Spot[] {
   return [
-    { id: 'campsite', panoUrl: '/panos/campsite.jpg', audioMix: { wind: 0.3, river: 0.08, birds: true, insects: false } },
-    { id: 'riverside', panoUrl: '/panos/riverside.jpg', audioMix: { wind: 0.15, river: 0.55, birds: false, insects: false } },
+    {
+      id: 'campsite',
+      panoUrl: '/panos/campsite.jpg',
+      audioMix: { wind: 0.3, river: 0.08, birds: true, insects: false },
+      snowfall: false,
+      destinations: ['riverside', 'snowfield'],
+    },
+    {
+      id: 'riverside',
+      panoUrl: '/panos/riverside.jpg',
+      audioMix: { wind: 0.15, river: 0.55, birds: false, insects: false },
+      snowfall: false,
+      destinations: ['campsite'],
+    },
+    {
+      id: 'snowfield',
+      panoUrl: '/panos/snowfield.jpg',
+      audioMix: { wind: 0.75, river: 0, birds: false, insects: false },
+      snowfall: true,
+      destinations: ['campsite'],
+    },
   ];
 }
 
@@ -76,5 +95,36 @@ describe('SpotManager', () => {
 
     sm.update(0.75); // フェードイン完了
     expect(sm.fadeOpacity).toBe(0);
+  });
+
+  it('supports hub-and-spoke: campsite can reach both riverside and snowfield directly', async () => {
+    const onApply = vi.fn();
+    const sm = new SpotManager(makeSpots(), onApply);
+
+    const done = sm.transitionTo('snowfield');
+    sm.update(0.75);
+    sm.update(0.75);
+    await done;
+
+    expect(sm.current).toBe('snowfield');
+    expect(onApply).toHaveBeenCalledWith(expect.objectContaining({ id: 'snowfield', snowfall: true }));
+  });
+
+  it('ignores transitionTo to a spot not listed in the current spot\'s destinations', async () => {
+    const onApply = vi.fn();
+    const sm = new SpotManager(makeSpots(), onApply);
+
+    // riverside -> snowfield へ直接遷移する（riverside.destinations には campsite しかない）
+    const toRiverside = sm.transitionTo('riverside');
+    sm.update(0.75);
+    sm.update(0.75);
+    await toRiverside;
+    expect(sm.current).toBe('riverside');
+
+    void sm.transitionTo('snowfield'); // destinations 制約により無視されるはず
+
+    expect(sm.busy).toBe(false);
+    expect(sm.current).toBe('riverside');
+    expect(onApply).toHaveBeenCalledTimes(1); // riverside への遷移の1回のみ
   });
 });

@@ -7,6 +7,7 @@ import { HUD } from './ui/HUD';
 import { PanoScene } from './pano/PanoScene';
 import { LookControls } from './pano/LookControls';
 import { SpotManager, type Spot } from './pano/SpotManager';
+import { Snowfall } from './pano/Snowfall';
 import { Grading } from './pano/Grading';
 import { GameState } from './systems/GameState';
 import { Interaction } from './systems/Interaction';
@@ -87,25 +88,36 @@ const WATER_ANGULAR_RADIUS = 0.15; // rad（約8.6度、水面は的が大きい
 const SPOT_LABELS: Record<Spot['id'], string> = {
   campsite: 'キャンプ地',
   riverside: '川辺',
+  snowfield: '雪山',
 };
 
+// ハブ&スポーク構成: campsite が中心（両方へ直接行ける）、riverside/snowfield は
+// campsite を経由しないと互いに行き来できない（SpotManager.transitionTo が destinations を強制）。
 const SPOTS: Spot[] = [
   {
     id: 'campsite',
     panoUrl: '/panos/campsite.jpg',
     audioMix: { wind: 0.3, river: 0.08, birds: true, insects: true },
+    snowfall: false,
+    destinations: ['riverside', 'snowfield'],
   },
   {
     id: 'riverside',
     panoUrl: '/panos/riverside.jpg',
     // Phase S: xanderklingeは正面に小さな滝があり水量感が増したため river を微調整
     audioMix: { wind: 0.15, river: 0.65, birds: false, insects: true },
+    snowfall: false,
+    destinations: ['campsite'],
+  },
+  {
+    id: 'snowfield',
+    panoUrl: '/panos/snowfield.jpg',
+    // 風が主役の静けさ。川も鳥も虫もいない雪山の孤独感を音でも表現する
+    audioMix: { wind: 0.75, river: 0, birds: false, insects: false },
+    snowfall: true,
+    destinations: ['campsite'],
   },
 ];
-
-function otherSpotId(id: Spot['id']): Spot['id'] {
-  return id === 'campsite' ? 'riverside' : 'campsite';
-}
 
 const appContainer = document.getElementById('app');
 if (!appContainer) {
@@ -209,25 +221,29 @@ const cooking = new Cooking(
 
 /**
  * 伐採・焚き火・ケトルは campsite だけ、水汲みは riverside だけで有効にする。
+ * snowfield には体験ホットスポットを置かない（眺めと音に浸る場所）。
  * ホットスポットの登録/解除（レイキャスト対象）だけでなく、焚き火・斧・ケトルの3D表示自体も
  * 切り替える（これらは常にシーンに存在するため、切り替えないと別スポットに透けて見えてしまう）。
  */
 function updateHotspotsForSpot(spotId: Spot['id']): void {
   const atCampsite = spotId === 'campsite';
+  const atRiverside = spotId === 'riverside';
 
   chopping.setVisible(atCampsite);
   fire.setVisible(atCampsite);
   cooking.setVisible(atCampsite);
 
+  // 一旦すべて外してから、このスポットで有効なものだけ入れ直す（remove は未登録でも安全）。
+  interaction.remove(chopping.hotspot);
+  interaction.remove(fire.interactable);
+  interaction.remove(cooking.fireKettleInteractable);
+  interaction.remove(cooking.waterHotspot);
+
   if (atCampsite) {
     interaction.add(chopping.hotspot);
     interaction.add(fire.interactable);
     interaction.add(cooking.fireKettleInteractable);
-    interaction.remove(cooking.waterHotspot);
-  } else {
-    interaction.remove(chopping.hotspot);
-    interaction.remove(fire.interactable);
-    interaction.remove(cooking.fireKettleInteractable);
+  } else if (atRiverside) {
     interaction.add(cooking.waterHotspot);
   }
 }
@@ -236,39 +252,58 @@ updateHotspotsForSpot(SPOTS[0].id);
 const grading = new Grading();
 const stars = buildStarField();
 engine.scene.add(stars);
+const snowfall = new Snowfall(engine.scene);
+snowfall.setEnabled(SPOTS[0].snowfall);
 
 const spotManager = new SpotManager(SPOTS, (spot) => {
   for (const [id, pano] of panoScenes) {
     pano.mesh.visible = id === spot.id;
   }
   updateHotspotsForSpot(spot.id);
-  updateSpotButton();
+  snowfall.setEnabled(spot.snowfall);
+  updateSpotButtons();
 });
 
-// 画面端の「川辺へ →」誘導ボタン。ui/HUD.ts は無改修のまま、専用の要素を #ui-root に直接追加する。
-const spotButton = document.createElement('button');
-spotButton.style.position = 'fixed';
-spotButton.style.right = '4%';
-spotButton.style.bottom = '10%';
-spotButton.style.padding = '0.6rem 1.1rem';
-spotButton.style.fontSize = '1rem';
-spotButton.style.fontFamily = 'sans-serif';
-spotButton.style.color = '#fff';
-spotButton.style.background = 'rgba(0, 0, 0, 0.35)';
-spotButton.style.border = '1px solid rgba(255, 255, 255, 0.6)';
-spotButton.style.borderRadius = '999px';
-spotButton.style.cursor = 'pointer';
-spotButton.style.pointerEvents = 'auto';
-spotButton.addEventListener('click', () => {
-  if (cooking.isSitting) return; // 座って飲む演出中はスポット遷移を始めない
-  void spotManager.transitionTo(otherSpotId(spotManager.current));
-});
-uiRoot.appendChild(spotButton);
+// 画面端の遷移先ボタン群。ui/HUD.ts は無改修のまま、専用の要素を #ui-root に直接追加する。
+// ハブ&スポーク構成のため、現在スポットの destinations 数に応じて複数ボタンを縦に並べる
+// （campsite にいるときは「川辺へ →」「雪山へ →」の2つ、riverside/snowfield では1つ）。
+const spotButtonsContainer = document.createElement('div');
+spotButtonsContainer.style.position = 'fixed';
+spotButtonsContainer.style.right = '4%';
+spotButtonsContainer.style.bottom = '10%';
+spotButtonsContainer.style.display = 'flex';
+spotButtonsContainer.style.flexDirection = 'column';
+spotButtonsContainer.style.alignItems = 'flex-end';
+spotButtonsContainer.style.gap = '0.6rem';
+uiRoot.appendChild(spotButtonsContainer);
 
-function updateSpotButton(): void {
-  spotButton.textContent = `${SPOT_LABELS[otherSpotId(spotManager.current)]}へ →`;
+function makeSpotButton(destinationId: Spot['id']): HTMLButtonElement {
+  const button = document.createElement('button');
+  button.style.padding = '0.6rem 1.1rem';
+  button.style.fontSize = '1rem';
+  button.style.fontFamily = 'sans-serif';
+  button.style.color = '#fff';
+  button.style.background = 'rgba(0, 0, 0, 0.35)';
+  button.style.border = '1px solid rgba(255, 255, 255, 0.6)';
+  button.style.borderRadius = '999px';
+  button.style.cursor = 'pointer';
+  button.style.pointerEvents = 'auto';
+  button.textContent = `${SPOT_LABELS[destinationId]}へ →`;
+  button.addEventListener('click', () => {
+    if (cooking.isSitting) return; // 座って飲む演出中はスポット遷移を始めない
+    void spotManager.transitionTo(destinationId);
+  });
+  return button;
 }
-updateSpotButton();
+
+function updateSpotButtons(): void {
+  spotButtonsContainer.replaceChildren();
+  const currentSpot = SPOTS.find((s) => s.id === spotManager.current) ?? SPOTS[0];
+  for (const destinationId of currentSpot.destinations) {
+    spotButtonsContainer.appendChild(makeSpotButton(destinationId));
+  }
+}
+updateSpotButtons();
 
 // スポット遷移時の暗転（黒ではなく白寄りのやわらかい暗転）。
 const fadeOverlay = document.createElement('div');
@@ -287,6 +322,7 @@ engine.onUpdate((dt) => {
   lookControls.update(dt);
   chopping.update(dt);
   gs.tick(dt);
+  snowfall.update(dt);
 
   grading.update(dt);
   const dayness = grading.dayness;
@@ -306,7 +342,7 @@ engine.onUpdate((dt) => {
   applyAmbientAudio(currentSpot, dayness);
 
   fadeOverlay.style.opacity = String(spotManager.fadeOpacity);
-  spotButton.style.visibility = spotManager.busy || cooking.isSitting ? 'hidden' : 'visible';
+  spotButtonsContainer.style.visibility = spotManager.busy || cooking.isSitting ? 'hidden' : 'visible';
 
   const { prompt } = interaction.update();
   hud.setPrompt(prompt);

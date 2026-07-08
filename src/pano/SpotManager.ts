@@ -6,9 +6,11 @@ export interface SpotAudioMix {
 }
 
 export interface Spot {
-  id: 'campsite' | 'riverside';
+  id: 'campsite' | 'riverside' | 'snowfield';
   panoUrl: string;
   audioMix: SpotAudioMix;
+  snowfall: boolean; // snowfield のみ true。main.ts が Snowfall.setEnabled に渡す
+  destinations: Spot['id'][]; // ハブ&スポーク遷移の許可先（ナビUIのボタン生成にも使う）
 }
 
 type TransitionState = 'idle' | 'fadingOut' | 'fadingIn';
@@ -22,10 +24,12 @@ interface PendingTransition {
 }
 
 /**
- * スポット（campsite / riverside）間のクロスフェード遷移を管理する状態機械
+ * スポット（campsite / riverside / snowfield）間のクロスフェード遷移を管理する状態機械
  * （idle → fadingOut → fadingIn → idle）。DOM に依存せず、フェードの進行は
  * update(dt) で駆動する。暗転オーバーレイの描画・実際のパノラマ/音声の切替は
  * onApply コールバック経由で main.ts 側が担う。busy 中の transitionTo は無視する。
+ * ハブ&スポーク構成のため、現在スポットの destinations に含まれない遷移も無視する
+ * （例: riverside → snowfield は不可。campsite を経由する必要がある）。
  */
 export class SpotManager {
   private state: TransitionState = 'idle';
@@ -61,6 +65,7 @@ export class SpotManager {
   transitionTo(id: Spot['id']): Promise<void> {
     if (this.busy) return Promise.resolve();
     if (id === this.currentSpot.id) return Promise.resolve();
+    if (!this.currentSpot.destinations.includes(id)) return Promise.resolve();
 
     const target = this.spots.find((s) => s.id === id);
     if (!target) return Promise.resolve();

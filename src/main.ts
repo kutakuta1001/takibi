@@ -91,19 +91,25 @@ const SPOT_LABELS: Record<Spot['id'], string> = {
   snowfield: '雪山',
 };
 
+// public/ 配下の静的アセットは vite.config.ts の base（相対配信用 './'）の対象外のため、
+// 先頭スラッシュ付きの絶対パス '/panos/...' だとサブパス配信（例: GitHub Pages の
+// プロジェクトページ）でドメインルート起点に解決されてしまう。先頭スラッシュを外した
+// 相対パスにすることで、常に index.html の配置場所を起点に解決させる。
+const panoUrl = (file: string): string => `panos/${file}`;
+
 // ハブ&スポーク構成: campsite が中心（両方へ直接行ける）、riverside/snowfield は
 // campsite を経由しないと互いに行き来できない（SpotManager.transitionTo が destinations を強制）。
 const SPOTS: Spot[] = [
   {
     id: 'campsite',
-    panoUrl: '/panos/campsite.jpg',
+    panoUrl: panoUrl('campsite.jpg'),
     audioMix: { wind: 0.3, river: 0.08, birds: true, insects: true },
     snowfall: false,
     destinations: ['riverside', 'snowfield'],
   },
   {
     id: 'riverside',
-    panoUrl: '/panos/riverside.jpg',
+    panoUrl: panoUrl('riverside.jpg'),
     // Phase S: xanderklingeは正面に小さな滝があり水量感が増したため river を微調整
     audioMix: { wind: 0.15, river: 0.65, birds: false, insects: true },
     snowfall: false,
@@ -111,7 +117,7 @@ const SPOTS: Spot[] = [
   },
   {
     id: 'snowfield',
-    panoUrl: '/panos/snowfield.jpg',
+    panoUrl: panoUrl('snowfield.jpg'),
     // 風が主役の静けさ。川も鳥も虫もいない雪山の孤独感を音でも表現する
     audioMix: { wind: 0.75, river: 0, birds: false, insects: false },
     snowfall: true,

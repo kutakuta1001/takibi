@@ -79,8 +79,9 @@ const FIRE_POSITION = new THREE.Vector3(0, -EYE_HEIGHT, -2.5);
 // 座って飲む演出でLookControls.lookAtが向く先（焚き火の方向とほぼ同じ、やや浅め）。
 const FIRE_LOOK_DIRECTION = { yaw: 0, pitch: -0.5 };
 
-// riverside パノラマ内の水面の方向（yaw/pitch）。プレイテストで見た目に合わせて調整済み。
-const WATER_DIRECTION = { yaw: 0.81, pitch: -0.31 };
+// riverside パノラマ内の水面の方向（yaw/pitch）。Phase S で xanderklinge に差し替えた際、
+// 正面の小さな滝と手前の流れが同時に収まる向きへプレイテストで再調整済み。
+const WATER_DIRECTION = { yaw: 0, pitch: -0.3 };
 const WATER_ANGULAR_RADIUS = 0.15; // rad（約8.6度、水面は的が大きいのでTREE_ANGULAR_RADIUSより広め）
 
 const SPOT_LABELS: Record<Spot['id'], string> = {
@@ -97,7 +98,8 @@ const SPOTS: Spot[] = [
   {
     id: 'riverside',
     panoUrl: '/panos/riverside.jpg',
-    audioMix: { wind: 0.15, river: 0.55, birds: false, insects: true },
+    // Phase S: xanderklingeは正面に小さな滝があり水量感が増したため river を微調整
+    audioMix: { wind: 0.15, river: 0.65, birds: false, insects: true },
   },
 ];
 

@@ -17,17 +17,22 @@
 
 ## riverside.jpg
 
-- 元アセット: [Mossy Forest](https://polyhaven.com/a/mossy_forest)（Poly Haven ID: `mossy_forest`）
-- 作者: Greg Zaal
+- 元アセット: [Xanderklinge](https://polyhaven.com/a/xanderklinge)（Poly Haven ID: `xanderklinge`）
+- 作者: Andreas Mischok
 - ライセンス: CC0
-- 選定理由: 苔むした岩と浅い渓流が画面下部すぐ近くにあり、「水面が近い」選定基準に合致。
-  riverside スポット（水汲み）のベース写真として採用
+- 選定理由（Phase S・2026-07-08差し替え）: CEO指摘「水面がほとんど写っていない」を受けて
+  mossy_forest から差し替え。正面に小さな滝が落ち、手前に水音の立つ浅い流れが広がる渓谷の
+  底で、「水がはっきり写っている」選定基準に合致。苔むした岩壁・倒木のみで人工物ゼロ。
+  4096x2048全域を上（空・崖上）・中央・下（水面直下）の3帯に分けて拡大スキャンし、
+  倒木に見えた斜線状の物体も樹皮・根株・つららの確認できる自然の倒木と判定（ロープ等ではない）。
+  ゲーム内レンダリングでも360度スキャンして人工物なしを確認。riverside スポット
+  （水汲み）のベース写真として採用
 
 ## サイズ
 
 - campsite.jpg: 約4.3MB
-- riverside.jpg: 約3.9MB
-- 合計: 約8.2MB（予算35MB以内）
+- riverside.jpg: 約3.3MB
+- 合計: 約7.6MB（予算35MB以内。snowfield.jpg追加後も再計算予定）
 
 ## 比較検討したが採用しなかった候補
 
@@ -40,3 +45,7 @@
   nature_reserve_forest / dark_autumn_forest / autumn_forest_04
 - riverside（Phase P・mossy_forest採用時の比較。参考）: stream / river_rocks / xanderklinge /
   monbachtal_riverbank / whipple_creek_gazebo
+- riverside（Phase S・xanderklinge採用時の比較）: blue_grotto（渓谷全体は良好だが、ゲーム内
+  レンダリングを拡大確認したところ谷を横断するロープ／ケーブルが見つかり不採用）/
+  crystal_falls（滝は魅力的だが岩の上に置かれたバックパックが写り込み人の存在を示すため不採用）/
+  lago_disola（湖面は美しいが拡大確認でコンクリート製の堰と小屋のような構造物が判明し不採用）

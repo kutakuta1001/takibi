@@ -3,8 +3,9 @@ import Alea from 'alea';
 import { Engine } from './core/Engine';
 import { Input } from './core/Input';
 import { Title } from './ui/Title';
+import { Credits } from './ui/Credits';
 import { HUD } from './ui/HUD';
-import { PanoScene } from './pano/PanoScene';
+import { PanoScene, SNOWFIELD_NIGHT_GRADING } from './pano/PanoScene';
 import { LookControls } from './pano/LookControls';
 import { SpotManager, type Spot } from './pano/SpotManager';
 import { Snowfall } from './pano/Snowfall';
@@ -165,7 +166,10 @@ for (const spot of SPOTS) {
           engine.scene.environment = pmremGenerator.fromEquirectangular(texture).texture;
           pmremGenerator.dispose();
         }
-      : undefined
+      : undefined,
+    // snowfield は元写真が非常に明るい雪面主体のため、forest系と同じ夜グレーディングでは
+    // 「月夜」らしさが出ない（詳細は PanoScene.ts の SNOWFIELD_NIGHT_GRADING コメント参照）。
+    spot.id === 'snowfield' ? SNOWFIELD_NIGHT_GRADING : undefined
   );
   pano.mesh.visible = spot.id === SPOTS[0].id;
   engine.scene.add(pano.mesh);
@@ -354,12 +358,16 @@ engine.onUpdate((dt) => {
   hud.setPrompt(prompt);
 });
 
+const credits = new Credits();
 const title = new Title(
   () => {
     engine.start();
   },
   () => {
     audio.unlock();
+  },
+  () => {
+    credits.toggle();
   }
 );
 title.show();

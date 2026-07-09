@@ -1,7 +1,7 @@
 export class Title {
   private readonly element: HTMLDivElement;
 
-  constructor(onStart: () => void, onUnlock?: () => void) {
+  constructor(onStart: () => void, onUnlock?: () => void, onCredits?: () => void) {
     this.element = document.createElement('div');
     this.element.style.position = 'fixed';
     this.element.style.inset = '0';
@@ -32,6 +32,27 @@ export class Title {
     controls.style.opacity = '0.75';
 
     this.element.append(heading, startHint, controls);
+
+    if (onCredits) {
+      const creditsButton = document.createElement('button');
+      creditsButton.textContent = '写真クレジット';
+      creditsButton.style.position = 'fixed';
+      creditsButton.style.right = '4%';
+      creditsButton.style.bottom = '4%';
+      creditsButton.style.padding = '0.4rem 1rem';
+      creditsButton.style.fontSize = '0.85rem';
+      creditsButton.style.color = '#fff';
+      creditsButton.style.background = 'rgba(255, 255, 255, 0.08)';
+      creditsButton.style.border = '1px solid rgba(255, 255, 255, 0.4)';
+      creditsButton.style.borderRadius = '999px';
+      creditsButton.style.cursor = 'pointer';
+      // クリックがタイトル全体の click ハンドラ（ゲーム開始）まで届かないように止める。
+      creditsButton.addEventListener('click', (event) => {
+        event.stopPropagation();
+        onCredits();
+      });
+      this.element.appendChild(creditsButton);
+    }
 
     this.element.addEventListener('click', () => {
       onUnlock?.();

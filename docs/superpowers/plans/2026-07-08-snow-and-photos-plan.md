@@ -106,6 +106,39 @@ export class Snowfall {   // カメラ空間の降雪パーティクル（THREE.
 
 ---
 
+### Task S5: 雪山を雄大な雪稜パノラマへ差し替え（2026-07-09 追加）
+
+CEO レビュー結果: S3 で採用した snowy_forest（残雪の針葉樹林）は世界観「探検家しか行けない雪山」に
+未達。CC0 では雄大な雪山パノラマが入手できなかったため、CEO 承認のもと CC BY-SA 4.0 を許容し、
+Piz d'Err パノラマ（Wikimedia Commons）へ差し替える。あわせて降雪表現とクレジット表記を整える。
+
+**採用アセット（確定）:**
+- Piz d'Err Spherical Panorama / 作者: Capricorn4049 / ライセンス: CC BY-SA 4.0 /
+  出典: https://commons.wikimedia.org/wiki/File:Piz_d%E2%80%99Err_Spherical_Panorama.jpg /
+  フルサイズ DL: https://upload.wikimedia.org/wikipedia/commons/1/10/Piz_d%E2%80%99Err_Spherical_Panorama.jpg
+  （21504x10752・約22MB。4096x2048 にリサイズして使う）
+
+**Files:**
+- Replace: `public/panos/snowfield.jpg`
+- Create: `src/ui/Credits.ts`（クレジット表示）
+- Modify: `public/panos/ATTRIBUTION.md`, `src/pano/Snowfall.ts`, `src/pano/Grading.ts`（雪山夜の色調）,
+  `src/ui/Title.ts`（クレジットへの導線）, `src/main.ts`
+
+- [ ] フルサイズを DL → `sips` で 4096x2048 にリサイズ → `public/panos/snowfield.jpg` を置換
+      （元の snowy_forest は破棄）。1600px 版で人工物なしは確認済みだが、4K でも塔・小屋・
+      リフト索道等が無いことを念のため全周スキャンし報告
+- [ ] ATTRIBUTION.md に CC BY-SA 4.0 の帰属表示（作者・ライセンス・元URL・変更内容=リサイズ）を記録。
+      ファイル冒頭に「本ファイルには CC0 と CC BY-SA が混在する」旨を明記
+- [ ] `src/ui/Credits.ts`: 半透明オーバーレイのクレジット画面。各パノラマの作者・ライセンス・
+      リンクを列挙（CC BY-SA の帰属表示義務を満たす）。Title からボタンで開閉。UI 文言は日本語
+- [ ] 降雪改善: `Snowfall.ts` のパーティクルが白い四角に見える問題を解消（円形の柔らかい
+      スプライト化 = Canvas で放射状グラデの点テクスチャを生成、サイズをばらつかせ、加算合成を避け
+      通常合成で雪片らしく。落下にゆらぎ）。雄大な雪山では量をやや増やす
+- [ ] `Grading.ts`: 雪山は元写真が明るい昼なので、夜グレーディングを青白い月夜（露出低下・青方偏移・
+      彩度低下）に調整。雪面が黒潰れせず月明かりで青白く沈むこと。星は既存仰角マスク流用
+- [ ] スクリーンショット（昼・夜・降雪が雪片に見えること・クレジット画面）→ build/test（17件維持）
+      → Commit — `feat: replace snowfield with alpine summit panorama and add credits`
+
 ## 実行体制
 
 - 実装: Sonnet 5 サブエージェント（タスクごとコミット）。写真選定は本フェーズの品質の8割を

@@ -18,9 +18,12 @@
 
 - Vanilla Three.js + TypeScript + Vite。React・物理エンジン・ポストプロセスは導入しない
 - dependencies は three / simplex-noise / alea のみ。追加は CEO 承認必須
-- 映像は CC0 実写360°パノラマ（Poly Haven、トーンマップ済み 4K JPG、`public/panos/` に保存・
-  `ATTRIBUTION.md` に出典記録、合計30MB以下）。前景3D（焚き火等）のテクスチャは
-  `public/textures/` の CC0 素材。Google マップ等の規約制限のある画像は使わない
+- 映像は実写360°パノラマ（equirectangular・トーンマップ済み 4K JPG・`public/panos/`・
+  3枚合計35MB以下）。ライセンスは CC0 が第一候補、世界観に合う CC0 が無ければ CC BY / CC BY-SA も可
+  （その場合 `ATTRIBUTION.md` への出典記録 + アプリ内クレジット表記で帰属表示。CC BY-SA は
+  画像とコードを分離）。ソースは Poly Haven / ambientCG（CC0）と Wikimedia Commons（CC BY-SA）。
+  前景3D（焚き火等）のテクスチャは `public/textures/` の CC0 素材。Google マップ等の
+  規約制限のある画像は使わない
 - 移動機能は実装しない（見回し + スポット遷移のみ）。PointerLock は使わない
 - 音は手続き合成のまま（CEO 高評価点）。CC0 音源への切り替えは CEO に提案してから
 - GameState.ts は Three.js 非依存を厳守（単体テスト対象）。audio/synths.ts と合わせて

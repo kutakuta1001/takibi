@@ -63,9 +63,19 @@ src/foreground/
 
 ## 3. アセット方針
 
-- パノラマ: Poly Haven の CC0 HDRI を**トーンマップ済み 4K JPG**で取得（EXR は使わない）。
-  夕方〜ゴールデンアワーの森 1 枚 + 川辺 1 枚。`public/panos/` に保存、
-  出典は `public/panos/ATTRIBUTION.md` に記録。合計 30MB 以下
+- パノラマのライセンス方針（2026-07-09 CEO 承認で拡張）: **CC0 を第一候補**とし、CC0 で
+  世界観（設計原則参照）に合う写真が入手できない場合は **CC BY / CC BY-SA も許容**する。
+  CC BY / CC BY-SA を使う場合は (1) `ATTRIBUTION.md` に作者名・ライセンス・元URL・変更内容
+  （リサイズ・トーンマップ等）を記録し、(2) アプリ内にクレジット表記（クレジット画面または
+  タイトルからの導線）を設けて帰属表示義務を満たす。CC BY-SA は継承義務があるため、画像ファイルと
+  アプリのソースコードは分離して扱う（画像の改変版が CC BY-SA になるのであってコードには及ばない）。
+  ソースは Poly Haven / ambientCG（CC0）と Wikimedia Commons（CC BY-SA 主流）を主に使う。
+  Google マップ等の規約制限のある画像は引き続き不可
+- パノラマ形式: **トーンマップ済み equirectangular JPG（4096x2048）**（HDR/EXR は使わない）。
+  `public/panos/` に保存。3枚合計 35MB 以下
+- 実績（2026-07-09 時点）: campsite=forest_slope（Poly Haven CC0）/ riverside=xanderklinge（同）/
+  snowfield=Piz d'Err Spherical Panorama（Wikimedia Commons, 作者 Capricorn4049, CC BY-SA 4.0・
+  スイス3000m級山頂の360°雪稜パノラマ・人工物なし）
 - 選定基準: 焚き火を置ける開けた地面がある / 視線の高さが人の立ち位置 / 川辺は水面が近い。
   実装時に Poly Haven を実際に閲覧して選定し、選定理由を報告する
 - 炎の表現: (a) v1 の3Dパーティクル炎の移植 と (b) CC0 実写炎動画のビルボード合成 を

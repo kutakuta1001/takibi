@@ -1,13 +1,31 @@
 # handoff.md
 
-完了: パノラマ転換 Task P1〜P7（`43b2a82`〜`41594dd`）+ P8 前景仕上げ（`f50aa05`）+ Phase S 写真差し替え・雪山スポット追加（`b17dc09` S1 / `fb632e1` S2 / `5ac9267` S3 / 本コミット S4）。実写360°パノラマ3スポット（Poly Haven CC0: campsite=forest_slope・深い原生林 / riverside=xanderklinge・水面はっきり写る渓谷 / snowfield=snowy_forest・新規追加）+ ハブ&スポーク遷移（campsite が中心）+ 降雪パーティクル（Snowfall.ts、snowfield限定）+ 体験連鎖 + 夕⇔夜グレーディング。旧3D歩行版は `archive/3d-walkable` に保全。build / test（17件）グリーン。3スポット通し確認（campsite→riverside→campsite→snowfield→campsite）を本番ビルド（`npm run preview`）で実施し、console エラーなし・campsite での焚き火/斧の続行を確認済み。
+## 現在地（2026-07-09）
 
-配信準備: `vite.config.ts` に `base: './'` を追加し、`src/main.ts` の panoUrl も先頭スラッシュを外した相対パスに修正（サブパス配信対応。README.md に配信手順を追記）。**実際のホスティング先の選定・公開は行っていない（CEO確認事項）**。
+実写360°パノラマ版 Takibi が3スポットで完成。CEO ブラウザ受け入れ確認待ち。
 
-既知の軽微な残課題:
-- 画面最上部の樹冠に星がわずかに残る（仰角マスクの近似ゆえ、Phase P からの既知事項）
-- 斧の造形は簡素
-- `src/foreground/Fire.ts` の `FLAME_VIDEO_URL = '/fire/bonfire-loop.mp4'` が先頭スラッシュ付き絶対パスのまま（Phase S の対象範囲外のため未修正）。ドメインルート配信では問題ないが、サブパス配信時はこの動画だけ404になる可能性がある。次フェーズで `panos` と同様に相対パス化するとよい
-- snowfield の写真（snowy_forest）は「人工物ゼロ」は満たすが、CEOが想起する「雪原・雪の稜線・遠くに山並みが見える」ような雄大な眺望ではなく、雪がまだら残る針葉樹林の内部（Poly Haven の雪山/稜線系候補約150件を確認したが、電線・建物・ロープ・スキー跡・ベンチ等の人工物のない稜線/展望写真が見つからなかったため。詳細は `public/panos/ATTRIBUTION.md` の比較候補一覧を参照）。CEOのイメージとズレる可能性があり、ブラウザ受け入れ時に確認してほしい
+完了:
+- 3スポット（campsite=深い原生林 / riverside=渓谷の滝・水面がはっきり写る / snowfield=Piz d'Err
+  スイス3000m級の雪稜パノラマ）。ハブ&スポーク遷移（キャンプ地が基地）
+- 体験連鎖（伐採→薪→焚き火→川辺で水汲み→戻って火にかける→座って飲む）+ 手続き合成音
+- 夕⇔夜グレーディング（各スポット黒潰れなし）・降雪パーティクル（雪片化）・写真クレジット画面
+- ライセンス: campsite/riverside=Poly Haven CC0、snowfield=Wikimedia CC BY-SA 4.0（帰属表示は
+  ATTRIBUTION.md + アプリ内クレジット画面で充足。画像とコードは分離）
+- 配信準備: `base: './'`・相対パス化済み（サブパス配信可）。旧3D歩行版は `archive/3d-walkable` に保全
+- build / test（17件）グリーン。panos 合計 9.0MB
 
-次のアクション: CEO ブラウザ受け入れ確認（3スポットの世界観・snowfield写真の雰囲行想定通りか・降雪の見え方・実機fps）→ Opus 4.8 で Phase S の完了レビュー → 配信先（GitHub Pages / Cloudflare Pages / 社内サーバー等）の選定と実際の公開を CEO 判断で実施 → 次フェーズ（タイトル画面などの UI/UX 磨き）を writing-plans で計画。
+既知の残課題（軽微）:
+- snowfield の谷底遠景にごく小さく集落らしき陰影（3000m級山頂実写に自然に伴う遠景。前景人工物では
+  ないが CEO 確認事項）
+- 実機 GPU での fps 未計測（エージェント環境はソフトウェア描画）
+- 画面最上部の樹冠に星がわずかに残る（仰角マスク近似）・斧の造形は簡素
+
+## 次のアクション
+
+1. CEO ブラウザ受け入れ確認（`npm run dev` → 3スポット周遊・体験連鎖・実機fps・谷底遠景の許容可否）
+2. 次フェーズ Phase U（UI/UX 磨き: タイトル/ナビ/HUD の質感・音響強化・モバイル検討）を
+   writing-plans で計画（CEO 確定の優先順位）
+3. 公開: 社内向け・作りやすい方法で。ホスティング先選定と公開実行は CEO 確認を経る
+
+正典: `docs/superpowers/specs/2026-07-07-panorama-experience-design.md`（設計書）、
+`docs/superpowers/plans/2026-07-08-snow-and-photos-plan.md`（Phase S 計画・S1〜S5）、`ROADMAP.md`。

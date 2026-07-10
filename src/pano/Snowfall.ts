@@ -18,6 +18,9 @@ const SWAY_AMPLITUDE_MAX = 0.45;
 const SWAY_SPEED_MIN = 0.6;
 const SWAY_SPEED_MAX = 1.4;
 const SNOWFLAKE_TEXTURE_SIZE = 32;
+// Gusts.strength（0..1）に応じて雪を一方向へ流す最大オフセット。基礎風0.3前後では控えめ、
+// 突風時（0.8超）だけ「風に流れる」とはっきり気づける程度まで強める。
+const WIND_DRIFT_MAX = 1.1;
 
 interface SizeGroupSpec {
   size: number;
@@ -155,9 +158,11 @@ export class Snowfall {
     }
   }
 
-  update(dt: number): void {
+  /** windStrength は Gusts.strength（0..1）を想定。省略時は0（無風）として既存挙動のまま。 */
+  update(dt: number, windStrength: number = 0): void {
     if (!this.enabled) return;
     this.time += dt;
+    const drift = windStrength * WIND_DRIFT_MAX;
 
     for (const group of this.groups) {
       const position = group.points.geometry.getAttribute('position') as THREE.BufferAttribute;
@@ -167,7 +172,7 @@ export class Snowfall {
           y = VOLUME_TOP;
         }
         const sway = Math.sin(this.time * group.swaySpeeds[i] + group.swayPhases[i]) * group.swayAmplitudes[i];
-        position.setX(i, group.baseX[i] + sway);
+        position.setX(i, group.baseX[i] + sway + drift);
         position.setY(i, y);
         position.setZ(i, group.baseZ[i]);
       }

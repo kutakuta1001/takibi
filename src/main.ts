@@ -9,12 +9,14 @@ import { PanoScene, SNOWFIELD_NIGHT_GRADING } from './pano/PanoScene';
 import { LookControls } from './pano/LookControls';
 import { SpotManager, type Spot } from './pano/SpotManager';
 import { Snowfall } from './pano/Snowfall';
+import { Gusts } from './pano/Gusts';
 import { Grading } from './pano/Grading';
 import { GameState } from './systems/GameState';
 import { Interaction } from './systems/Interaction';
 import { Chopping } from './foreground/Chopping';
 import { Fire } from './foreground/Fire';
 import { Cooking } from './foreground/Cooking';
+import { Breath } from './foreground/Breath';
 import { AudioEngine } from './audio/AudioEngine';
 import { createWind, createRiver, createBirds, createInsects } from './audio/synths';
 import { Reverb, REVERB_PRESETS } from './audio/Reverb';
@@ -204,9 +206,11 @@ insects.output.connect(audio.reverbSend);
  * wind/river はスポット固定のミックス、birds/insects は「そのスポットで鳴き得るか
  * （Spot.audioMix の boolean）」と「今何時か（Grading.dayness）」を組み合わせて毎フレーム決める
  * （鳥は夕方側 dayness>0.4、虫は夜側 dayness<0.3 で createBirds/createInsects の閾値と噛み合う）。
+ * wind は Gusts.strength（0..1、基礎風0.3前後を中心にゆっくり変動し時折突風）でも変調する
+ * （campsite では同じ風音が葉ずれとしても機能するため、専用の合成は追加しない）。
  */
-function applyAmbientAudio(spot: Spot, dayness: number): void {
-  wind.setIntensity(spot.audioMix.wind);
+function applyAmbientAudio(spot: Spot, dayness: number, gustStrength: number): void {
+  wind.setIntensity(spot.audioMix.wind * (0.7 + 0.6 * gustStrength));
   river.setIntensity(spot.audioMix.river);
   birds.setIntensity(spot.audioMix.birds ? dayness : 0);
   insects.setIntensity(spot.audioMix.insects ? dayness : 1);
@@ -276,6 +280,9 @@ const stars = buildStarField();
 engine.scene.add(stars);
 const snowfall = new Snowfall(engine.scene);
 snowfall.setEnabled(SPOTS[0].snowfall);
+const gusts = new Gusts();
+const breath = new Breath(engine.scene, engine.camera);
+breath.setEnabled(SPOTS[0].id === 'snowfield');
 
 const spotManager = new SpotManager(SPOTS, (spot) => {
   for (const [id, pano] of panoScenes) {
@@ -283,6 +290,7 @@ const spotManager = new SpotManager(SPOTS, (spot) => {
   }
   updateHotspotsForSpot(spot.id);
   snowfall.setEnabled(spot.snowfall);
+  breath.setEnabled(spot.id === 'snowfield');
   reverb.apply(REVERB_PRESETS[spot.id]);
   updateSpotButtons();
 });
@@ -345,7 +353,9 @@ engine.onUpdate((dt) => {
   lookControls.update(dt);
   chopping.update(dt);
   gs.tick(dt);
-  snowfall.update(dt);
+  gusts.update(dt);
+  snowfall.update(dt, gusts.strength);
+  breath.update(dt);
 
   grading.update(dt);
   const dayness = grading.dayness;
@@ -362,7 +372,7 @@ engine.onUpdate((dt) => {
     : 0;
 
   const currentSpot = SPOTS.find((s) => s.id === spotManager.current) ?? SPOTS[0];
-  applyAmbientAudio(currentSpot, dayness);
+  applyAmbientAudio(currentSpot, dayness, gusts.strength);
 
   fadeOverlay.style.opacity = String(spotManager.fadeOpacity);
   spotButtonsContainer.style.visibility = spotManager.busy || cooking.isSitting ? 'hidden' : 'visible';

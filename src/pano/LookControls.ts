@@ -5,6 +5,12 @@ const PITCH_LIMIT = (80 * Math.PI) / 180;
 const INERTIA_DAMPING_PER_SECOND = 0.05; // 1秒あたりに角速度をこの比率まで減衰させる
 const INERTIA_STOP_THRESHOLD = 0.001; // これ未満の角速度（rad/s）は0とみなして揺れを止める
 
+// 無操作時の「呼吸」揺らぎ（居る感）。酔い防止のため振幅は厳守する（0.10〜0.15度の範囲内）。
+const IDLE_SWAY_PERIOD_SECONDS = 4.5;
+const IDLE_SWAY_AMPLITUDE_RAD = (0.13 * Math.PI) / 180;
+const IDLE_SWAY_FADE_IN_SECONDS = 3; // ゆっくりフェードイン
+const NO_SWAY = { yaw: 0, pitch: 0 };
+
 function clampPitch(pitch: number): number {
   return Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, pitch));
 }
@@ -43,6 +49,8 @@ export class LookControls {
   private dragging = false;
   private lastMoveTime = 0;
   private animation: LookAtAnimation | null = null;
+  private swayTime = 0;
+  private swayFade = 0; // 0..1。ドラッグ開始/lookAt開始で即座に0へ落とす
 
   /** 現在の視点（Cooking の座って飲む演出が、終了後に元の視点へ戻すために使う）。 */
   get currentYaw(): number {
@@ -57,6 +65,7 @@ export class LookControls {
     if (!this.enabled) return;
     this.dragging = true;
     this.animation = null;
+    this.swayFade = 0; // ドラッグ開始で呼吸揺らぎを即座にフェードアウト
     this.yawVelocity = 0;
     this.pitchVelocity = 0;
     this.lastMoveTime = performance.now();
@@ -118,6 +127,9 @@ export class LookControls {
 
       this.yaw += this.yawVelocity * dt;
       this.pitch = clampPitch(this.pitch + this.pitchVelocity * dt);
+
+      this.swayTime += dt;
+      this.swayFade = Math.min(1, this.swayFade + dt / IDLE_SWAY_FADE_IN_SECONDS);
     }
 
     this.applyRotation();
@@ -129,6 +141,7 @@ export class LookControls {
       this.dragging = false;
       this.yawVelocity = 0;
       this.pitchVelocity = 0;
+      this.swayFade = 0; // 演出アニメーション中は呼吸揺らぎを重ねない
       this.animation = {
         fromYaw: this.yaw,
         fromPitch: this.pitch,
@@ -158,7 +171,19 @@ export class LookControls {
     }
   }
 
+  /** 無操作時に呼吸のようにゆっくり揺れるyaw/pitchの微小オフセット（振幅0.13度・swayFadeで補間）。 */
+  private computeIdleSway(): { yaw: number; pitch: number } {
+    if (this.swayFade <= 0) return NO_SWAY;
+    const phase = (this.swayTime / IDLE_SWAY_PERIOD_SECONDS) * Math.PI * 2;
+    const amount = IDLE_SWAY_AMPLITUDE_RAD * this.swayFade;
+    return {
+      yaw: Math.sin(phase) * amount,
+      pitch: Math.sin(phase + Math.PI / 2) * amount,
+    };
+  }
+
   private applyRotation(): void {
-    this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
+    const sway = this.computeIdleSway();
+    this.camera.rotation.set(this.pitch + sway.pitch, this.yaw + sway.yaw, 0, 'YXZ');
   }
 }

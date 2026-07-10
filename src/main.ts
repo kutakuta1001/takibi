@@ -20,6 +20,7 @@ import { Breath } from './foreground/Breath';
 import { AudioEngine } from './audio/AudioEngine';
 import { createWind, createRiver, createBirds, createInsects } from './audio/synths';
 import { Reverb, REVERB_PRESETS } from './audio/Reverb';
+import { playFootsteps, type Ground } from './audio/footsteps';
 
 const STAR_COUNT = 800;
 const STAR_RADIUS = 45; // パノラマ球（半径50）の内側
@@ -94,6 +95,14 @@ const SPOT_LABELS: Record<Spot['id'], string> = {
   riverside: '川辺',
   snowfield: '雪山',
 };
+
+// 足音の地面種別（旅する遷移: 出発地/到着地それぞれの足音に使う）。
+const GROUND_BY_SPOT: Record<Spot['id'], Ground> = {
+  campsite: 'grass',
+  riverside: 'rock',
+  snowfield: 'snow',
+};
+const TRANSITION_STEP_COUNT = 2;
 
 // public/ 配下の静的アセットは vite.config.ts の base（相対配信用 './'）の対象外のため、
 // 先頭スラッシュ付きの絶対パス '/panos/...' だとサブパス配信（例: GitHub Pages の
@@ -202,18 +211,39 @@ const insects = createInsects(audio.ctx);
 insects.output.connect(audio.master);
 insects.output.connect(audio.reverbSend);
 
+// 足音専用バス。dry(master)とリバーブへ並列送信し、岩場（riverside）では他の環境音と
+// 同じ空間感（残響）を足音にも乗せる。
+const footstepsBus = audio.ctx.createGain();
+footstepsBus.gain.value = 1;
+footstepsBus.connect(audio.master);
+footstepsBus.connect(audio.reverbSend);
+
+// 環境音ミックスの「今向かっている先」。SpotManager.onApproach（暗転が深まった頃合い）で
+// 目的地へ切り替え、onApply（クロスオーバー）でも保険として同期する。これにより
+// 「姿より先に音が到着する」体験になる（実際の値はonUpdateで滑らかに追従させる）。
+let ambientTargetSpot: Spot = SPOTS[0];
+let ambientWindMix = SPOTS[0].audioMix.wind;
+let ambientRiverMix = SPOTS[0].audioMix.river;
+const AMBIENT_MIX_RESPONSE = 1.2; // 大きいほど新しいミックスへ速く追従する
+
+function approachValue(current: number, target: number, dt: number): number {
+  const t = 1 - Math.exp(-AMBIENT_MIX_RESPONSE * dt);
+  return current + (target - current) * t;
+}
+
 /**
- * wind/river はスポット固定のミックス、birds/insects は「そのスポットで鳴き得るか
- * （Spot.audioMix の boolean）」と「今何時か（Grading.dayness）」を組み合わせて毎フレーム決める
- * （鳥は夕方側 dayness>0.4、虫は夜側 dayness<0.3 で createBirds/createInsects の閾値と噛み合う）。
+ * wind/river はスポットのミックスへ滑らかに追従した値（ambientWindMix/ambientRiverMix）を使う。
+ * birds/insects は「そのスポットで鳴き得るか（Spot.audioMix の boolean）」と「今何時か
+ * （Grading.dayness）」を組み合わせて毎フレーム決める（鳥は夕方側 dayness>0.4、虫は夜側
+ * dayness<0.3 で createBirds/createInsects の閾値と噛み合う）。
  * wind は Gusts.strength（0..1、基礎風0.3前後を中心にゆっくり変動し時折突風）でも変調する
  * （campsite では同じ風音が葉ずれとしても機能するため、専用の合成は追加しない）。
  */
-function applyAmbientAudio(spot: Spot, dayness: number, gustStrength: number): void {
-  wind.setIntensity(spot.audioMix.wind * (0.7 + 0.6 * gustStrength));
-  river.setIntensity(spot.audioMix.river);
-  birds.setIntensity(spot.audioMix.birds ? dayness : 0);
-  insects.setIntensity(spot.audioMix.insects ? dayness : 1);
+function applyAmbientAudio(dayness: number, gustStrength: number): void {
+  wind.setIntensity(ambientWindMix * (0.7 + 0.6 * gustStrength));
+  river.setIntensity(ambientRiverMix);
+  birds.setIntensity(ambientTargetSpot.audioMix.birds ? dayness : 0);
+  insects.setIntensity(ambientTargetSpot.audioMix.insects ? dayness : 1);
 }
 
 const gs = new GameState();
@@ -284,16 +314,25 @@ const gusts = new Gusts();
 const breath = new Breath(engine.scene, engine.camera);
 breath.setEnabled(SPOTS[0].id === 'snowfield');
 
-const spotManager = new SpotManager(SPOTS, (spot) => {
-  for (const [id, pano] of panoScenes) {
-    pano.mesh.visible = id === spot.id;
+const spotManager = new SpotManager(
+  SPOTS,
+  (spot) => {
+    for (const [id, pano] of panoScenes) {
+      pano.mesh.visible = id === spot.id;
+    }
+    updateHotspotsForSpot(spot.id);
+    snowfall.setEnabled(spot.snowfall);
+    breath.setEnabled(spot.id === 'snowfield');
+    reverb.apply(REVERB_PRESETS[spot.id]);
+    ambientTargetSpot = spot; // 保険（通常は onApproach で既に切り替わっている）
+    playFootsteps(audio.ctx, footstepsBus, GROUND_BY_SPOT[spot.id], TRANSITION_STEP_COUNT); // 到着地の足音
+    updateSpotButtons();
+  },
+  (target) => {
+    // 姿より先に音が到着する: 暗転が深まった頃合いで到着地の環境音ミックスへ先行フェードインを始める
+    ambientTargetSpot = target;
   }
-  updateHotspotsForSpot(spot.id);
-  snowfall.setEnabled(spot.snowfall);
-  breath.setEnabled(spot.id === 'snowfield');
-  reverb.apply(REVERB_PRESETS[spot.id]);
-  updateSpotButtons();
-});
+);
 
 // 画面端の遷移先ボタン群。ui/HUD.ts は無改修のまま、専用の要素を #ui-root に直接追加する。
 // ハブ&スポーク構成のため、現在スポットの destinations 数に応じて複数ボタンを縦に並べる
@@ -322,7 +361,14 @@ function makeSpotButton(destinationId: Spot['id']): HTMLButtonElement {
   button.textContent = `${SPOT_LABELS[destinationId]}へ →`;
   button.addEventListener('click', () => {
     if (cooking.isSitting) return; // 座って飲む演出中はスポット遷移を始めない
+    const departureSpot = SPOTS.find((s) => s.id === spotManager.current);
+    const wasBusy = spotManager.busy;
     void spotManager.transitionTo(destinationId);
+    // 遷移が実際に始まった（busy が false→true になった）ときだけ、出発地の足音を鳴らす
+    // （フェードアウト開始と同時、というタイミングをここで捉える）。
+    if (!wasBusy && spotManager.busy && departureSpot) {
+      playFootsteps(audio.ctx, footstepsBus, GROUND_BY_SPOT[departureSpot.id], TRANSITION_STEP_COUNT);
+    }
   });
   return button;
 }
@@ -371,8 +417,9 @@ engine.onUpdate((dt) => {
     ? THREE.MathUtils.clamp(1 - dayness / STAR_HIDE_DAYNESS, 0, 1)
     : 0;
 
-  const currentSpot = SPOTS.find((s) => s.id === spotManager.current) ?? SPOTS[0];
-  applyAmbientAudio(currentSpot, dayness, gusts.strength);
+  ambientWindMix = approachValue(ambientWindMix, ambientTargetSpot.audioMix.wind, dt);
+  ambientRiverMix = approachValue(ambientRiverMix, ambientTargetSpot.audioMix.river, dt);
+  applyAmbientAudio(dayness, gusts.strength);
 
   fadeOverlay.style.opacity = String(spotManager.fadeOpacity);
   spotButtonsContainer.style.visibility = spotManager.busy || cooking.isSitting ? 'hidden' : 'visible';

@@ -44,13 +44,13 @@ describe('SpotManager', () => {
     expect(sm.current).toBe('campsite'); // フェードアウト中はまだ切り替わっていない
     expect(onApply).not.toHaveBeenCalled();
 
-    sm.update(0.75); // フェードアウト完了 → ここで切り替え
+    sm.update(1.1); // フェードアウト完了 → ここで切り替え
     expect(onApply).toHaveBeenCalledTimes(1);
     expect(onApply).toHaveBeenCalledWith(expect.objectContaining({ id: 'riverside' }));
     expect(sm.current).toBe('riverside');
     expect(sm.busy).toBe(true); // フェードイン中はまだ busy
 
-    sm.update(0.75); // フェードイン完了
+    sm.update(1.5); // フェードイン完了
     await done;
     expect(sm.busy).toBe(false);
     expect(sm.current).toBe('riverside');
@@ -64,8 +64,8 @@ describe('SpotManager', () => {
     void sm.transitionTo('riverside');
     void sm.transitionTo('riverside'); // busy 中なので無視される
 
-    sm.update(0.75);
-    sm.update(0.75);
+    sm.update(1.1);
+    sm.update(1.5);
 
     expect(onApply).toHaveBeenCalledTimes(1);
     expect(sm.busy).toBe(false);
@@ -87,13 +87,13 @@ describe('SpotManager', () => {
     void sm.transitionTo('riverside');
     expect(sm.fadeOpacity).toBe(0);
 
-    sm.update(0.375); // フェードアウト半分
+    sm.update(0.55); // フェードアウト半分
     expect(sm.fadeOpacity).toBeCloseTo(0.5);
 
-    sm.update(0.375); // フェードアウト完了 → フェードイン開始
+    sm.update(0.55); // フェードアウト完了 → フェードイン開始
     expect(sm.fadeOpacity).toBeCloseTo(1);
 
-    sm.update(0.75); // フェードイン完了
+    sm.update(1.5); // フェードイン完了
     expect(sm.fadeOpacity).toBe(0);
   });
 
@@ -102,8 +102,8 @@ describe('SpotManager', () => {
     const sm = new SpotManager(makeSpots(), onApply);
 
     const done = sm.transitionTo('snowfield');
-    sm.update(0.75);
-    sm.update(0.75);
+    sm.update(1.1);
+    sm.update(1.5);
     await done;
 
     expect(sm.current).toBe('snowfield');
@@ -116,8 +116,8 @@ describe('SpotManager', () => {
 
     // riverside -> snowfield へ直接遷移する（riverside.destinations には campsite しかない）
     const toRiverside = sm.transitionTo('riverside');
-    sm.update(0.75);
-    sm.update(0.75);
+    sm.update(1.1);
+    sm.update(1.5);
     await toRiverside;
     expect(sm.current).toBe('riverside');
 
@@ -126,5 +126,33 @@ describe('SpotManager', () => {
     expect(sm.busy).toBe(false);
     expect(sm.current).toBe('riverside');
     expect(onApply).toHaveBeenCalledTimes(1); // riverside への遷移の1回のみ
+  });
+
+  it('fires onApproach with the pending target before onApply, ahead of the crossover', () => {
+    const onApply = vi.fn();
+    const onApproach = vi.fn();
+    const sm = new SpotManager(makeSpots(), onApply, onApproach);
+
+    void sm.transitionTo('riverside');
+    sm.update(0.6); // まだ閾値（1.1-0.4=0.7秒）未満
+    expect(onApproach).not.toHaveBeenCalled();
+
+    sm.update(0.2); // 合計0.8秒。閾値を超えたが、フェードアウト完了（1.1秒）前
+    expect(onApproach).toHaveBeenCalledTimes(1);
+    expect(onApproach).toHaveBeenCalledWith(expect.objectContaining({ id: 'riverside' }));
+    expect(onApply).not.toHaveBeenCalled();
+
+    sm.update(0.4); // 合計1.2秒でフェードアウト完了 → onApply発火
+    expect(onApply).toHaveBeenCalledTimes(1);
+    expect(onApproach).toHaveBeenCalledTimes(1); // 二重発火しない
+  });
+
+  it('does not throw when onApproach is omitted', () => {
+    const sm = new SpotManager(makeSpots(), vi.fn());
+    void sm.transitionTo('riverside');
+    expect(() => {
+      sm.update(1.1);
+      sm.update(1.5);
+    }).not.toThrow();
   });
 });

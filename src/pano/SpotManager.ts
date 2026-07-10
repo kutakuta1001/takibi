@@ -15,12 +15,18 @@ export interface Spot {
 
 type TransitionState = 'idle' | 'fadingOut' | 'fadingIn';
 
-const FADE_OUT_SECONDS = 0.75;
-const FADE_IN_SECONDS = 0.75;
+// 「旅する遷移」（Phase U）に合わせ 1.5→2.6 秒へ拡張。フェードアウト中に出発地の足音、
+// フェードイン開始時に到着地の足音を鳴らす余地を持たせる。
+const FADE_OUT_SECONDS = 1.1;
+const FADE_IN_SECONDS = 1.5;
+// フェードアウト完了のこれだけ手前で onApproach を発火する（画面が十分暗くなった頃合いで、
+// 到着地の環境音を先行フェードインさせるため。「姿より先に音が到着する」体験のコア）。
+const AMBIENCE_LEAD_SECONDS = 0.4;
 
 interface PendingTransition {
   target: Spot;
   resolve: () => void;
+  approached: boolean;
 }
 
 /**
@@ -30,6 +36,8 @@ interface PendingTransition {
  * onApply コールバック経由で main.ts 側が担う。busy 中の transitionTo は無視する。
  * ハブ&スポーク構成のため、現在スポットの destinations に含まれない遷移も無視する
  * （例: riverside → snowfield は不可。campsite を経由する必要がある）。
+ * onApproach は fadingOut が十分進んだ時点（暗転中）で一度だけ発火する音フック
+ * （main.ts が到着地の環境音を先行フェードインさせるために使う。onApply より前に呼ばれる）。
  */
 export class SpotManager {
   private state: TransitionState = 'idle';
@@ -39,7 +47,8 @@ export class SpotManager {
 
   constructor(
     private readonly spots: Spot[],
-    private readonly onApply: (spot: Spot) => void
+    private readonly onApply: (spot: Spot) => void,
+    private readonly onApproach?: (target: Spot) => void
   ) {
     if (spots.length === 0) {
       throw new Error('SpotManager には最低1つの Spot が必要');
@@ -73,7 +82,7 @@ export class SpotManager {
     return new Promise((resolve) => {
       this.state = 'fadingOut';
       this.elapsed = 0;
-      this.pending = { target, resolve };
+      this.pending = { target, resolve, approached: false };
     });
   }
 
@@ -81,14 +90,21 @@ export class SpotManager {
     if (this.state === 'idle') return;
     this.elapsed += dt;
 
-    if (this.state === 'fadingOut' && this.elapsed >= FADE_OUT_SECONDS) {
+    if (this.state === 'fadingOut') {
       const pending = this.pending;
-      if (pending) {
-        this.currentSpot = pending.target;
-        this.onApply(pending.target);
+      if (pending && !pending.approached && this.elapsed >= FADE_OUT_SECONDS - AMBIENCE_LEAD_SECONDS) {
+        pending.approached = true;
+        this.onApproach?.(pending.target);
       }
-      this.state = 'fadingIn';
-      this.elapsed = 0;
+
+      if (this.elapsed >= FADE_OUT_SECONDS) {
+        if (pending) {
+          this.currentSpot = pending.target;
+          this.onApply(pending.target);
+        }
+        this.state = 'fadingIn';
+        this.elapsed = 0;
+      }
       return;
     }
 

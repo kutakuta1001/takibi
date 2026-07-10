@@ -5,6 +5,7 @@ import { Input } from './core/Input';
 import { Title } from './ui/Title';
 import { Credits } from './ui/Credits';
 import { HUD } from './ui/HUD';
+import { IdleWatcher } from './ui/IdleWatcher';
 import { PanoScene, SNOWFIELD_NIGHT_GRADING } from './pano/PanoScene';
 import { LookControls } from './pano/LookControls';
 import { SpotManager, type Spot } from './pano/SpotManager';
@@ -103,6 +104,13 @@ const GROUND_BY_SPOT: Record<Spot['id'], Ground> = {
   snowfield: 'snow',
 };
 const TRANSITION_STEP_COUNT = 2;
+
+// UIの消灯（Phase U）。無操作でナビボタン・所持品トレイが消え、世界だけが残る。
+const IDLE_SECONDS = 8;
+const IDLE_FADE_OUT_SECONDS = 1.5; // idle化: ゆっくりフェードアウト
+const IDLE_FADE_IN_SECONDS = 0.3; // 復帰: すぐフェードイン
+const NAV_BUTTON_OPACITY = 0.7; // 通常時の視認性を一段下げる
+const NAV_BUTTON_HOVER_OPACITY = 1.0;
 
 // public/ 配下の静的アセットは vite.config.ts の base（相対配信用 './'）の対象外のため、
 // 先頭スラッシュ付きの絶対パス '/panos/...' だとサブパス配信（例: GitHub Pages の
@@ -334,7 +342,7 @@ const spotManager = new SpotManager(
   }
 );
 
-// 画面端の遷移先ボタン群。ui/HUD.ts は無改修のまま、専用の要素を #ui-root に直接追加する。
+// 画面端の遷移先ボタン群。専用の要素を #ui-root に直接追加する（HUD.ts はプロンプト/所持品トレイ用）。
 // ハブ&スポーク構成のため、現在スポットの destinations 数に応じて複数ボタンを縦に並べる
 // （campsite にいるときは「川辺へ →」「雪山へ →」の2つ、riverside/snowfield では1つ）。
 const spotButtonsContainer = document.createElement('div');
@@ -345,6 +353,8 @@ spotButtonsContainer.style.display = 'flex';
 spotButtonsContainer.style.flexDirection = 'column';
 spotButtonsContainer.style.alignItems = 'flex-end';
 spotButtonsContainer.style.gap = '0.6rem';
+spotButtonsContainer.style.opacity = '1';
+spotButtonsContainer.style.transition = `opacity ${IDLE_FADE_IN_SECONDS}s ease`;
 uiRoot.appendChild(spotButtonsContainer);
 
 function makeSpotButton(destinationId: Spot['id']): HTMLButtonElement {
@@ -358,7 +368,15 @@ function makeSpotButton(destinationId: Spot['id']): HTMLButtonElement {
   button.style.borderRadius = '999px';
   button.style.cursor = 'pointer';
   button.style.pointerEvents = 'auto';
+  button.style.opacity = String(NAV_BUTTON_OPACITY);
+  button.style.transition = 'opacity 0.2s ease';
   button.textContent = `${SPOT_LABELS[destinationId]}へ →`;
+  button.addEventListener('mouseenter', () => {
+    button.style.opacity = String(NAV_BUTTON_HOVER_OPACITY);
+  });
+  button.addEventListener('mouseleave', () => {
+    button.style.opacity = String(NAV_BUTTON_OPACITY);
+  });
   button.addEventListener('click', () => {
     if (cooking.isSitting) return; // 座って飲む演出中はスポット遷移を始めない
     const departureSpot = SPOTS.find((s) => s.id === spotManager.current);
@@ -391,7 +409,19 @@ fadeOverlay.style.opacity = '0';
 fadeOverlay.style.pointerEvents = 'none';
 uiRoot.appendChild(fadeOverlay);
 
+// 無操作でナビボタン・所持品トレイが消え、世界だけが残る（中央の文脈プロンプトは対象外）。
+const idleWatcher = new IdleWatcher(IDLE_SECONDS);
+idleWatcher.onChange((idle) => {
+  hud.setIdle(idle);
+  spotButtonsContainer.style.transition = `opacity ${idle ? IDLE_FADE_OUT_SECONDS : IDLE_FADE_IN_SECONDS}s ease`;
+  spotButtonsContainer.style.opacity = idle ? '0' : '1';
+});
+window.addEventListener('mousemove', () => idleWatcher.activity());
+window.addEventListener('keydown', () => idleWatcher.activity());
+window.addEventListener('pointerdown', () => idleWatcher.activity());
+
 engine.onUpdate((dt) => {
+  idleWatcher.update(dt);
   spotManager.update(dt);
   // スポット遷移中・座って飲む演出中はユーザーのドラッグ見回しを止める
   // （lookControls.enabled の書き手が複数あるため、毎フレームここで合成する）。

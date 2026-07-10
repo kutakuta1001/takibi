@@ -1,6 +1,8 @@
 import type { KettleState } from '../systems/GameState';
 
 const DEFAULT_FLASH_SECONDS = 3;
+const IDLE_FADE_OUT_SECONDS = 1.5; // idle化: ゆっくりフェードアウト
+const IDLE_FADE_IN_SECONDS = 0.3; // 復帰: すぐフェードイン
 
 const KETTLE_LABELS: Record<KettleState, string> = {
   empty: 'なし',
@@ -37,6 +39,8 @@ export class HUD {
     this.inventoryEl.style.fontSize = '0.95rem';
     this.inventoryEl.style.textShadow = '0 1px 3px rgba(0,0,0,0.8)';
     this.inventoryEl.style.pointerEvents = 'none';
+    this.inventoryEl.style.opacity = '1';
+    this.inventoryEl.style.transition = `opacity ${IDLE_FADE_IN_SECONDS}s ease`;
 
     this.flashEl = document.createElement('div');
     this.flashEl.style.position = 'fixed';
@@ -62,6 +66,15 @@ export class HUD {
 
   setInventory(logs: number, kettle: KettleState): void {
     this.inventoryEl.textContent = `薪: ${logs}　ケトル: ${KETTLE_LABELS[kettle]}`;
+  }
+
+  /**
+   * 無操作時に所持品トレイを消灯する（DOMは残す）。中央の文脈プロンプト（promptEl）は
+   * 体験の道標のため対象外（idle中に何も見ていなければ元々表示されない）。
+   */
+  setIdle(idle: boolean): void {
+    this.inventoryEl.style.transition = `opacity ${idle ? IDLE_FADE_OUT_SECONDS : IDLE_FADE_IN_SECONDS}s ease`;
+    this.inventoryEl.style.opacity = idle ? '0' : '1';
   }
 
   flashMessage(text: string, seconds: number = DEFAULT_FLASH_SECONDS): void {

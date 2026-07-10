@@ -17,6 +17,7 @@ import { Fire } from './foreground/Fire';
 import { Cooking } from './foreground/Cooking';
 import { AudioEngine } from './audio/AudioEngine';
 import { createWind, createRiver, createBirds, createInsects } from './audio/synths';
+import { Reverb, REVERB_PRESETS } from './audio/Reverb';
 
 const STAR_COUNT = 800;
 const STAR_RADIUS = 45; // パノラマ球（半径50）の内側
@@ -179,14 +180,25 @@ for (const spot of SPOTS) {
 const lookControls = new LookControls(engine.camera, engine.renderer.domElement);
 
 const audio = new AudioEngine();
+
+// スポットごとの空間感（残響）。dry(master)経路は変えず、環境音だけ並列でリバーブへ送る。
+const reverb = new Reverb(audio.ctx);
+audio.reverbSend.connect(reverb.input);
+reverb.output.connect(audio.master);
+reverb.apply(REVERB_PRESETS[SPOTS[0].id], 0); // 起動直後は即時反映（フェードなし）
+
 const wind = createWind(audio.ctx);
 wind.output.connect(audio.master);
+wind.output.connect(audio.reverbSend);
 const river = createRiver(audio.ctx);
 river.output.connect(audio.master);
+river.output.connect(audio.reverbSend);
 const birds = createBirds(audio.ctx);
 birds.output.connect(audio.master);
+birds.output.connect(audio.reverbSend);
 const insects = createInsects(audio.ctx);
 insects.output.connect(audio.master);
+insects.output.connect(audio.reverbSend);
 
 /**
  * wind/river はスポット固定のミックス、birds/insects は「そのスポットで鳴き得るか
@@ -271,6 +283,7 @@ const spotManager = new SpotManager(SPOTS, (spot) => {
   }
   updateHotspotsForSpot(spot.id);
   snowfall.setEnabled(spot.snowfall);
+  reverb.apply(REVERB_PRESETS[spot.id]);
   updateSpotButtons();
 });
 

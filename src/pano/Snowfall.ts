@@ -158,11 +158,16 @@ export class Snowfall {
     }
   }
 
-  /** windStrength は Gusts.strength（0..1）を想定。省略時は0（無風）として既存挙動のまま。 */
+  /**
+   * windStrength は Gusts.strength（0..1）を想定。省略時は0（無風）として既存挙動のまま。
+   * 二乗で効かせる（品質原則の自己点検で調整）: 基礎風0.3前後の常時ドリフトは既存sway振幅
+   * （0.2〜0.45）より十分小さく抑えつつ、突風時（0.8超）だけ「風に流れる」と分かる強さにする
+   * （線形だと常時ドリフトがswayと同程度になり、気づかれやすくなりすぎたため）。
+   */
   update(dt: number, windStrength: number = 0): void {
     if (!this.enabled) return;
     this.time += dt;
-    const drift = windStrength * WIND_DRIFT_MAX;
+    const drift = windStrength * windStrength * WIND_DRIFT_MAX;
 
     for (const group of this.groups) {
       const position = group.points.geometry.getAttribute('position') as THREE.BufferAttribute;

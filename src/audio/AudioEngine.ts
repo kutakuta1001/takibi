@@ -14,10 +14,19 @@ export class AudioEngine {
     this.reverbSend.gain.value = 1;
   }
 
-  /** ユーザー操作（クリック）のタイミングで呼び、ブラウザの自動再生制限を解除する。 */
-  unlock(): void {
+  /**
+   * ユーザー操作（クリック）のタイミングで呼び、ブラウザの自動再生制限を解除する。
+   * resume() の成否を反映した Promise<boolean> を返す（true = 再生可能な状態になった）。
+   * 呼び出し側が await しなくても（fire-and-forgetでも）挙動は変わらない。
+   */
+  async unlock(): Promise<boolean> {
     if (this.ctx.state === 'suspended') {
-      void this.ctx.resume();
+      try {
+        await this.ctx.resume();
+      } catch {
+        return false;
+      }
     }
+    return this.ctx.state === 'running';
   }
 }

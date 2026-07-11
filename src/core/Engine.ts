@@ -4,6 +4,18 @@ import { ForestTheme } from '../theme/ForestTheme';
 
 const DT_MAX = 0.1;
 
+/**
+ * WebGLRenderer の生成に失敗した（=ブラウザ/GPUがWebGLを使えない）ことを表す。
+ * main.ts はこれを捕捉して #ui-root に可読なフォールバック文言を表示する。
+ */
+export class EngineInitError extends Error {
+  constructor(cause: unknown) {
+    super('WebGLRenderer の初期化に失敗しました');
+    this.name = 'EngineInitError';
+    this.cause = cause;
+  }
+}
+
 export class Engine {
   readonly scene: THREE.Scene;
   readonly camera: THREE.PerspectiveCamera;
@@ -25,7 +37,12 @@ export class Engine {
     );
     this.camera.position.set(0, 1.6, 8);
 
-    this.renderer = new THREE.WebGLRenderer({ antialias: true });
+    try {
+      this.renderer = new THREE.WebGLRenderer({ antialias: true });
+    } catch (error) {
+      // 例外を握り潰さず、main.ts が可読メッセージを出すための専用エラー型に包んで投げ直す。
+      throw new EngineInitError(error);
+    }
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;

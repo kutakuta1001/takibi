@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import Alea from 'alea';
-import { Engine } from './core/Engine';
+import { Engine, EngineInitError } from './core/Engine';
 import { Input } from './core/Input';
 import { Title } from './ui/Title';
 import { Credits } from './ui/Credits';
@@ -155,7 +155,37 @@ if (!uiRoot) {
   throw new Error('#ui-root が見つかりません');
 }
 
-const engine = new Engine(appContainer);
+/** WebGL が使えない環境向けの、可読な全画面フォールバック文言。 */
+function showFatalMessage(root: HTMLElement, message: string): void {
+  const el = document.createElement('div');
+  el.style.position = 'fixed';
+  el.style.inset = '0';
+  el.style.display = 'flex';
+  el.style.alignItems = 'center';
+  el.style.justifyContent = 'center';
+  el.style.padding = '2rem';
+  el.style.textAlign = 'center';
+  el.style.background = '#000';
+  el.style.color = '#fff';
+  el.style.fontFamily = 'sans-serif';
+  el.style.fontSize = '1.1rem';
+  el.style.lineHeight = '1.8';
+  el.textContent = message;
+  root.appendChild(el);
+}
+
+let engine: Engine;
+try {
+  engine = new Engine(appContainer);
+} catch (error) {
+  if (error instanceof EngineInitError) {
+    showFatalMessage(
+      uiRoot,
+      'お使いのブラウザでは 3D 表示（WebGL）を利用できませんでした。PC の Chrome / Edge / Firefox / Safari 最新版でお試しください'
+    );
+  }
+  throw error;
+}
 
 // Engine.ts は他用途でも使うため無改修のまま、地形時代のプレースホルダー地面とフォグは
 // このパノラマ体験には不要なのでここで取り除く（フォグは実写と馴染まず遠景を白飛びさせる）。
@@ -479,6 +509,24 @@ engine.onUpdate((dt) => {
   hud.setPrompt(prompt);
 });
 
+/**
+ * 音のアンロックに失敗した場合（resume() が失敗、もしくは何らかの理由で状態が running に
+ * ならなかった場合）、理由を示して次のクリック/キー入力で再試行する。
+ */
+function tryUnlockAudio(): void {
+  void audio.unlock().then((unlocked) => {
+    if (unlocked) return;
+    hud.flashMessage('音を再生できませんでした。画面をクリックすると再試行します');
+    const retry = () => {
+      window.removeEventListener('click', retry);
+      window.removeEventListener('keydown', retry);
+      tryUnlockAudio();
+    };
+    window.addEventListener('click', retry, { once: true });
+    window.addEventListener('keydown', retry, { once: true });
+  });
+}
+
 const credits = new Credits();
 const title = new Title(
   () => campsitePano.load(),
@@ -486,7 +534,7 @@ const title = new Title(
     engine.start();
   },
   () => {
-    audio.unlock();
+    tryUnlockAudio();
   },
   () => {
     credits.toggle();

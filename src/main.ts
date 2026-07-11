@@ -6,6 +6,8 @@ import { PauseGate } from './core/PauseGate';
 import { Title } from './ui/Title';
 import { Credits } from './ui/Credits';
 import { HUD } from './ui/HUD';
+import { AreaTitle } from './ui/AreaTitle';
+import { nextHint, SPOT_NAMES } from './ui/hints';
 import { IdleWatcher } from './ui/IdleWatcher';
 import { VolumeControl } from './ui/VolumeControl';
 import { DebugOverlay } from './ui/DebugOverlay';
@@ -321,6 +323,7 @@ function applyAmbientAudio(dayness: number, gustStrength: number): void {
 
 const gs = new GameState();
 const hud = new HUD();
+const areaTitle = new AreaTitle();
 const volumeControl = new VolumeControl(audio.master);
 const input = new Input();
 const interaction = new Interaction(engine.camera, input, gs, engine.renderer.domElement);
@@ -421,6 +424,7 @@ const spotManager = new SpotManager(
     ambientTargetSpot = spot; // 保険（通常は onApproach で既に切り替わっている）
     playFootsteps(audio.ctx, footstepsBus, GROUND_BY_SPOT[spot.id], TRANSITION_STEP_COUNT); // 到着地の足音
     updateSpotButtons();
+    areaTitle.show(SPOT_NAMES[spot.id], nextHint(gs, spot.id));
   },
   {
     onApproach: (target) => {
@@ -615,6 +619,7 @@ const title = new Title(
     // （マスクも読み込み完了時のコールバックで計算済み）ので、開始スポットへ即時適用する。
     applyStarMaskForSpot(SPOTS[0].id);
     engine.start();
+    areaTitle.show(SPOT_NAMES[SPOTS[0].id], nextHint(gs, SPOTS[0].id));
   },
   () => {
     tryUnlockAudio();

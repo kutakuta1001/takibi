@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import Alea from 'alea';
 import { Engine, EngineInitError } from './core/Engine';
 import { Input } from './core/Input';
+import { PauseGate } from './core/PauseGate';
 import { Title } from './ui/Title';
 import { Credits } from './ui/Credits';
 import { HUD } from './ui/HUD';
@@ -467,7 +468,24 @@ window.addEventListener('mousemove', () => idleWatcher.activity());
 window.addEventListener('keydown', () => idleWatcher.activity());
 window.addEventListener('pointerdown', () => idleWatcher.activity());
 
+// タブが裏に回っている間はシミュレーションと音を止める（薪の燃焼・抽出が裏で進み続けない
+// ようにする）。GameState.ts 自体は変更せず、呼び出し側（この onUpdate）でゲートする。
+const pauseGate = new PauseGate();
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    pauseGate.paused = true;
+    void audio.ctx.suspend();
+  } else {
+    pauseGate.paused = false;
+    void audio.ctx.resume();
+  }
+});
+
 engine.onUpdate((dt) => {
+  const gated = pauseGate.filter(dt);
+  if (gated === null) return; // タブ非表示中: 更新も描画対象の状態変更も一切行わない
+  dt = gated; // 復帰直後の1フレームだけ RESUME_DT_CLAMP に差し替えられている
+
   idleWatcher.update(dt);
   spotManager.update(dt);
   // スポット遷移中・座って飲む演出中はユーザーのドラッグ見回しを止める

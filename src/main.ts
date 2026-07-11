@@ -21,6 +21,7 @@ import { Interaction } from './systems/Interaction';
 import { Chopping } from './foreground/Chopping';
 import { Fire } from './foreground/Fire';
 import { Cooking } from './foreground/Cooking';
+import { SitSequence } from './foreground/SitSequence';
 import { Breath } from './foreground/Breath';
 import { AudioEngine } from './audio/AudioEngine';
 import { createWind, createRiver, createBirds, createInsects } from './audio/synths';
@@ -321,14 +322,15 @@ refreshInventory();
 
 const chopping = new Chopping(engine.scene, engine.camera, audio, gs, TREE_DIRECTION, TREE_ANGULAR_RADIUS);
 const fire = new Fire(engine.scene, gs, audio, FIRE_POSITION);
+// 座って眺める/飲む演出は campsite(Cooking)・riverside/snowfield(RestSpot) で共有する単一インスタンス
+// （座りは同時に1つ。lookControls/interaction のロックもここに集約される）。
+const sitSequence = new SitSequence(lookControls, interaction, engine.camera, audio);
 const cooking = new Cooking(
   gs,
   hud,
   audio,
-  interaction,
-  lookControls,
+  sitSequence,
   engine.scene,
-  engine.camera,
   FIRE_POSITION,
   FIRE_LOOK_DIRECTION,
   WATER_DIRECTION,
@@ -531,6 +533,7 @@ engine.onUpdate((dt) => {
   }
   fire.update(dt, dayness);
   cooking.update(dt);
+  sitSequence.update(dt);
 
   const starVisible = dayness < STAR_HIDE_DAYNESS;
   stars.points.visible = starVisible;

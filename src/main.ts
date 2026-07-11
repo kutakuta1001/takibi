@@ -8,6 +8,7 @@ import { Credits } from './ui/Credits';
 import { HUD } from './ui/HUD';
 import { AreaTitle } from './ui/AreaTitle';
 import { nextHint, SPOT_NAMES } from './ui/hints';
+import { Help } from './ui/Help';
 import { IdleWatcher } from './ui/IdleWatcher';
 import { VolumeControl } from './ui/VolumeControl';
 import { DebugOverlay } from './ui/DebugOverlay';
@@ -393,6 +394,15 @@ const markerBindings: Array<{ marker: HotspotMarker; interactable: Interactable;
   { marker: snowfieldSeatMarker, interactable: snowfieldRest.hotspot, spotId: 'snowfield' },
 ];
 
+/** Help オーバーレイの「この場所でできること」。markerBindings を再利用し、開いた瞬間の実際の prompt(gs) を動的に列挙する。 */
+function currentSpotActions(): string[] {
+  const spotId = spotManager.current;
+  return markerBindings
+    .filter((binding) => binding.spotId === spotId)
+    .map((binding) => binding.interactable.prompt(gs))
+    .filter((text) => text !== '');
+}
+
 /**
  * 伐採・焚き火・ケトルは campsite だけ、水汲みは riverside だけで有効にする。
  * riverside/snowfield には「座って眺める」休憩スポット（RestSpot）を置く（snowfield は
@@ -465,6 +475,15 @@ const spotManager = new SpotManager(
 
 // ?debug=1 のときだけ表示するfps/レンダリング統計オーバーレイ（デフォルトはDOMを作らず無影響）。
 const debugOverlay = new DebugOverlay(engine.renderer, () => SPOT_LABELS[spotManager.current]);
+
+// H キー/右下「?」ボタンで開閉するヘルプ。開いている間の視点操作・E/クリックの停止は
+// engine.onUpdate 側で毎フレーム合成する（座り中との競合を避けるため、ここでは直接enabledを書かない）。
+const help = new Help(
+  () => SPOT_NAMES[spotManager.current],
+  () => currentSpotActions()
+);
+hud.onHelpClick(() => help.toggle());
+input.onKeyPress('KeyH', () => help.toggle());
 
 // 画面端の遷移先ボタン群。専用の要素を #ui-root に直接追加する（HUD.ts はプロンプト/所持品トレイ用）。
 // ハブ&スポーク構成のため、現在スポットの destinations 数に応じて複数ボタンを縦に並べる
@@ -580,9 +599,9 @@ engine.onUpdate((dt) => {
   debugOverlay.recordFrame(dt);
   idleWatcher.update(dt);
   spotManager.update(dt);
-  // スポット遷移中・座って飲む演出中はユーザーのドラッグ見回しを止める
+  // スポット遷移中・座って飲む演出中・ヘルプが開いている間はユーザーのドラッグ見回しを止める
   // （lookControls.enabled の書き手が複数あるため、毎フレームここで合成する）。
-  lookControls.enabled = !spotManager.busy && !cooking.isSitting;
+  lookControls.enabled = !spotManager.busy && !cooking.isSitting && !help.isOpen;
   lookControls.update(dt);
   chopping.update(dt);
   gs.tick(dt);
@@ -616,6 +635,10 @@ engine.onUpdate((dt) => {
     hud.flashMessage('向かっている…', 5);
   }
 
+  // 座り中・ヘルプが開いている間はE/クリックでの行動を止める（SitSequence.start/endの
+  // 個別呼び出しと役割が重なるが、こちらは毎フレーム合成するため競合しない。値は常に上書きされ、
+  // enabled=falseのとき interaction.update() は常に prompt:null を返す）。
+  interaction.setEnabled(!cooking.isSitting && !help.isOpen);
   const { prompt } = interaction.update();
   hud.setPrompt(prompt);
 

@@ -6,6 +6,7 @@ const FAILED_MESSAGE = '読み込みに失敗しました';
 const START_LABEL = 'はじめる';
 const RETRY_LABEL = '再試行';
 const HINT_TEXT = 'マウスドラッグで見回す';
+const HELP_HINT_TEXT = 'H: ヘルプ';
 const MOBILE_WARNING_TEXT = 'このアプリは PC ブラウザ推奨です。タッチでの視点操作には未対応です';
 // タッチ主体の入力（pointer: coarse）かつ画面幅が狭い場合のみ注意文を出す。ブロックはしない
 // （それでも「はじめる」は押せる）。タブレットの横向き利用等、幅が十分あるタッチ端末は対象外。
@@ -139,7 +140,12 @@ export class Title {
     hint.style.fontSize = '0.9rem';
     hint.style.opacity = '0.75';
 
-    this.stateArea.append(startButton, hint);
+    const helpHint = document.createElement('div');
+    helpHint.textContent = HELP_HINT_TEXT;
+    helpHint.style.fontSize = '0.85rem';
+    helpHint.style.opacity = '0.6';
+
+    this.stateArea.append(startButton, hint, helpHint);
 
     if (isMobileLikely()) {
       const warning = document.createElement('div');

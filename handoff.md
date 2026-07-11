@@ -2,6 +2,16 @@
 
 ## 現在地（2026-07-11）
 
+Phase E1「座る・飲む体験の統合（山頂の一杯）」Task 1〜4 完了（未push・親エージェントが
+検証後にpush予定）。Cooking の座りシーケンスを SitTimeline（純ロジック・TDD）+
+SitSequence（演出・campsite/riverside/snowfield 共有の単一インスタンス）に切り出し、
+riverside/snowfield に RestSpot（座って眺める）を追加。snowfield の RestSpot は
+coffeeAware=true で「山頂の一杯」（campsite で淹れたコーヒーを座って飲める。完了通知・
+チャイムなしで静かに終わる）に対応。Playwright通し確認（伐採→焚き火→水汲み→抽出→
+飲まずに雪山へ→山頂で座って飲む→kettle empty→campsiteに戻り再抽出→campsiteでの
+従来の座って飲むも両立）済み。build / test 52件グリーン（既存47件+SitTimeline新規5件）。
+次は E2（第4スポット・写真先行調査）。
+
 Phase R0（公開ゲート）+ Phase R1（公開体裁 + GitHub Pages 公開）完了。**公開済み**:
 https://kutakuta1001.github.io/takibi/ （main への push で自動デプロイ。
 `.github/workflows/deploy.yml` が npm ci → test → build → Pages デプロイを実行する）
@@ -58,13 +68,14 @@ R0/R1 完了内容（Task 1〜10 + 5.5、コミット順）:
 
 ## 次のアクション
 
-1. CEO 実機・他デバイスでの公開URL確認: https://kutakuta1001.github.io/takibi/
-   （イヤホン推奨。3スポット周遊で残響差・突風・白い息・足音の先行到着・無操作時のUI消灯・
-   星空・音量スライダーを体感確認）
-2. 以降は main への push で自動的に再デプロイされる（`.github/workflows/deploy.yml`）。
-   新規タスクは `docs/superpowers/plans/2026-07-11-r0-r1-release-plan.md` 完了により
-   未作成（次フェーズ着手前に superpowers:writing-plans で新規計画を作成すること）
+1. 親エージェントが Phase E1 の差分を検証後 push（`.github/workflows/deploy.yml` で自動デプロイ）
+   → CEO に公開URLでの「山頂の一杯」確認を依頼
+   （https://kutakuta1001.github.io/takibi/ 。campsiteで淹れて飲まずに雪山へ、山頂の岩場で
+   座って飲む→静かに終わることを確認）
+2. 次フェーズ E2（第4スポット・写真先行調査）着手前に superpowers:writing-plans で新規計画を作成する
+   （`docs/superpowers/plans/2026-07-11-e1-sit-and-summit-plan.md` は E1 で完了・経緯として保全）
 
 正典: `docs/superpowers/specs/2026-07-07-panorama-experience-design.md`（設計書）、
+`docs/superpowers/plans/2026-07-11-e1-sit-and-summit-plan.md`（E1計画・Task 1〜4）、
 `docs/superpowers/plans/2026-07-11-r0-r1-release-plan.md`（R0+R1計画・Task 1〜10）、
 `docs/superpowers/plans/2026-07-10-presence-polish-plan.md`（Phase U 計画・U1〜U5）、`ROADMAP.md`。

@@ -354,11 +354,13 @@ const riversideRest = new RestSpot(engine.scene, sitSequence, {
   angularRadius: RIVERSIDE_SEAT_ANGULAR_RADIUS,
   lookDirection: RIVERSIDE_VIEW_DIRECTION,
 });
-// coffeeAware は Task 4（山頂の一杯）で true にする。
+// 山頂の一杯: campsite で淹れたコーヒー（kettle==='ready'はグローバル保持）をここで座って飲める。
+// 完了通知・チャイムは出さない（静かに終わるのが正解。SitSequence.end は drinkCoffee() のみ呼ぶ）。
 const snowfieldRest = new RestSpot(engine.scene, sitSequence, {
   hotspotDirection: SNOWFIELD_SEAT_DIRECTION,
   angularRadius: SNOWFIELD_SEAT_ANGULAR_RADIUS,
   lookDirection: SNOWFIELD_VIEW_DIRECTION,
+  coffeeAware: true,
 });
 
 /**

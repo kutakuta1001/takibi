@@ -50,6 +50,9 @@ const LIGHT_FLICKER_AMOUNT = 0.3;
 const LIGHT_DISTANCE = 22;
 const LIGHT_HEIGHT = 0.6;
 const NIGHT_LIGHT_BOOST = 1.3; // 夜(dayness=0)は火の光の存在感を1.3倍に強める
+// 炎動画が使えないフォールバック時（ビルボード非表示）は炎そのものの視覚情報が失われるため、
+// 薪・火の粉・光だけでも焚き火が成立するよう火の粉のスポーン率と光の強さを1.3倍に補強する。
+const FALLBACK_NO_FLAME_BOOST = 1.3;
 
 const SPARK_COUNT = 60;
 const SPARK_BASE_RATE = 10;
@@ -449,7 +452,11 @@ export class Fire {
   private updateLight(intensity: number, dayness: number): void {
     const flicker = Math.sin(this.time * 13) * LIGHT_FLICKER_AMOUNT;
     const nightBoost = THREE.MathUtils.lerp(NIGHT_LIGHT_BOOST, 1, dayness); // 夜は火の光の存在感を強める
-    this.light.intensity = Math.max(0, (LIGHT_BASE_INTENSITY + intensity * LIGHT_FUEL_INTENSITY) * nightBoost + flicker);
+    const fallbackBoost = this.flameSprite.visible ? 1 : FALLBACK_NO_FLAME_BOOST;
+    this.light.intensity = Math.max(
+      0,
+      (LIGHT_BASE_INTENSITY + intensity * LIGHT_FUEL_INTENSITY) * nightBoost * fallbackBoost + flicker
+    );
   }
 
   private updateFlame(intensity: number): void {
@@ -459,7 +466,8 @@ export class Fire {
 
   private updateSparks(dt: number, intensity: number): void {
     const positionAttr = this.sparkPoints.geometry.attributes.position as THREE.BufferAttribute;
-    const spawnChance = SPARK_BASE_RATE * intensity * dt;
+    const fallbackBoost = this.flameSprite.visible ? 1 : FALLBACK_NO_FLAME_BOOST;
+    const spawnChance = SPARK_BASE_RATE * intensity * dt * fallbackBoost;
 
     for (let i = 0; i < this.sparks.length; i++) {
       const spark = this.sparks[i];

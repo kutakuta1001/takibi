@@ -428,6 +428,11 @@ function makeSpotButton(destinationId: Spot['id']): HTMLButtonElement {
     void spotManager.transitionTo(destinationId).then((result) => {
       if (result.status === 'failed') {
         hud.flashMessage('たどり着けなかった。通信を確認してもう一度');
+        // onApproach で先行フェードインを始めていた場合、環境音の目的地が到着先に
+        // 切り替わったままになっている。現在地（=留まる出発地）へ巻き戻す。
+        if (departureSpot) {
+          ambientTargetSpot = departureSpot;
+        }
       }
     });
     // 遷移が実際に始まった（busy が false→true になった）ときだけ、出発地の足音を鳴らす

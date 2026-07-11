@@ -196,6 +196,11 @@ for (const spot of SPOTS) {
   panoScenes.set(spot.id, pano);
 }
 
+// campsite は起動時に先行ロードする。riverside/snowfield は初回遷移時に SpotManager の
+// prepare フックで待つ（main.ts 側の非同期ロード周りの完成した UI 接続は Title を扱う Task 2 で行う。
+// ここでは失敗時に未処理の Promise rejection にならないよう握り潰すだけにしておく）。
+void panoScenes.get(SPOTS[0].id)!.load().catch(() => {});
+
 const lookControls = new LookControls(engine.camera, engine.renderer.domElement);
 
 const audio = new AudioEngine();
@@ -336,9 +341,13 @@ const spotManager = new SpotManager(
     playFootsteps(audio.ctx, footstepsBus, GROUND_BY_SPOT[spot.id], TRANSITION_STEP_COUNT); // 到着地の足音
     updateSpotButtons();
   },
-  (target) => {
-    // 姿より先に音が到着する: 暗転が深まった頃合いで到着地の環境音ミックスへ先行フェードインを始める
-    ambientTargetSpot = target;
+  {
+    onApproach: (target) => {
+      // 姿より先に音が到着する: 暗転が深まった頃合いで到着地の環境音ミックスへ先行フェードインを始める
+      ambientTargetSpot = target;
+    },
+    // riverside/snowfield は初回遷移時にここで読み込む（2回目以降は PanoScene.load() 側でキャッシュ済み）。
+    prepare: (id) => panoScenes.get(id)!.load(),
   }
 );
 
@@ -381,7 +390,11 @@ function makeSpotButton(destinationId: Spot['id']): HTMLButtonElement {
     if (cooking.isSitting) return; // 座って飲む演出中はスポット遷移を始めない
     const departureSpot = SPOTS.find((s) => s.id === spotManager.current);
     const wasBusy = spotManager.busy;
-    void spotManager.transitionTo(destinationId);
+    void spotManager.transitionTo(destinationId).then((result) => {
+      if (result.status === 'failed') {
+        hud.flashMessage('たどり着けなかった。通信を確認してもう一度');
+      }
+    });
     // 遷移が実際に始まった（busy が false→true になった）ときだけ、出発地の足音を鳴らす
     // （フェードアウト開始と同時、というタイミングをここで捉える）。
     if (!wasBusy && spotManager.busy && departureSpot) {
@@ -453,6 +466,10 @@ engine.onUpdate((dt) => {
 
   fadeOverlay.style.opacity = String(spotManager.fadeOpacity);
   spotButtonsContainer.style.visibility = spotManager.busy || cooking.isSitting ? 'hidden' : 'visible';
+  // 暗転が完了してもまだ遷移先の読み込みが終わっていない間、待たされている理由を示す。
+  if (spotManager.pendingPrepare) {
+    hud.flashMessage('向かっている…', 5);
+  }
 
   const { prompt } = interaction.update();
   hud.setPrompt(prompt);

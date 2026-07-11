@@ -11,6 +11,8 @@ export interface NightGrading {
   lift: number; // 夜の黒レベルの下限（0=リフトなし）。明暗差の大きい写真では影が黒潰れしないよう底上げする
 }
 
+export type PanoState = 'idle' | 'loading' | 'ready' | 'failed';
+
 // forest系（campsite/riverside）のベース値。露出低下量は各パノラマの元の色調に合わせて
 // Phase S1/S2 でプレイテストしながら調整済み（黒潰れしない範囲で最も夜らしく見える値）。
 const DEFAULT_NIGHT_GRADING: NightGrading = {
@@ -40,6 +42,9 @@ export const SNOWFIELD_NIGHT_GRADING: NightGrading = {
 export class PanoScene {
   readonly mesh: THREE.Mesh;
   private readonly material: THREE.MeshBasicMaterial;
+  private readonly loader = new THREE.TextureLoader();
+  private _state: PanoState = 'idle';
+  private loadPromise: Promise<void> | null = null;
 
   /**
    * onLoad: 画像デコード完了時に呼ばれる（例: main.ts が scene.environment 用の PMREM を焼くタイミング）。
@@ -48,19 +53,19 @@ export class PanoScene {
    * 値は全て uniform で持たせ、customProgramCacheKey は固定のままにする（GLSLソース自体は
    * スポット間で共通のため、値をリテラルとしてソースへ埋め込んでキーをインスタンスごとに
    * 変える必要はない。むしろ埋め込むとプログラムキャッシュの取り違えが起きる恐れがある）。
+   * テクスチャの読み込みはコンストラクタでは行わず load() を呼ぶまで idle のまま留める
+   * （main.ts が campsite だけ起動時に先行ロードし、riverside/snowfield は初回遷移時まで
+   * ネットワーク帯域を使わないようにするため）。
    */
   constructor(
-    url: string,
-    onLoad?: (texture: THREE.Texture) => void,
+    private readonly url: string,
+    private readonly onLoadCallback?: (texture: THREE.Texture) => void,
     nightGrading: NightGrading = DEFAULT_NIGHT_GRADING
   ) {
     const geometry = new THREE.SphereGeometry(SPHERE_RADIUS, SPHERE_WIDTH_SEGMENTS, SPHERE_HEIGHT_SEGMENTS);
     geometry.scale(-1, 1, 1);
 
-    const texture = new THREE.TextureLoader().load(url, onLoad);
-    texture.colorSpace = THREE.SRGBColorSpace;
-
-    this.material = new THREE.MeshBasicMaterial({ map: texture, toneMapped: false, fog: false });
+    this.material = new THREE.MeshBasicMaterial({ toneMapped: false, fog: false });
     this.material.customProgramCacheKey = () => 'pano-grading';
     this.material.onBeforeCompile = (shader) => {
       shader.uniforms.dayness = { value: 1 };
@@ -102,6 +107,43 @@ export class PanoScene {
     };
 
     this.mesh = new THREE.Mesh(geometry, this.material);
+  }
+
+  get state(): PanoState {
+    return this._state;
+  }
+
+  /**
+   * equirectangular JPGの読み込みを開始する。冪等: 読み込み中（'loading'）に重ねて呼んだ場合は
+   * 同じ Promise を返し二重フェッチしない。読み込み済み（'ready'）ならすぐ解決する Promise を返す。
+   * 失敗（'failed'）後に呼び直した場合は新しい読み込みを再試行する（Title の再試行ボタンから使う）。
+   */
+  load(): Promise<void> {
+    if (this.loadPromise && this._state !== 'failed') {
+      return this.loadPromise;
+    }
+
+    this._state = 'loading';
+    this.loadPromise = new Promise<void>((resolve, reject) => {
+      this.loader.load(
+        this.url,
+        (texture) => {
+          texture.colorSpace = THREE.SRGBColorSpace;
+          this.material.map = texture;
+          this.material.needsUpdate = true;
+          this._state = 'ready';
+          this.onLoadCallback?.(texture);
+          resolve();
+        },
+        undefined,
+        (error) => {
+          this._state = 'failed';
+          this.loadPromise = null; // 再試行できるようにキャッシュを外す
+          reject(error instanceof Error ? error : new Error(`pano load failed: ${this.url}`));
+        }
+      );
+    });
+    return this.loadPromise;
   }
 
   /** 夕⇔夜のグレーディング（露出・色温度・彩度）を適用する。dayness: 1=夕(ベース写真のまま)、0=夜。 */

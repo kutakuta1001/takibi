@@ -155,4 +155,15 @@ describe('SpotManager', () => {
       sm.update(1.5);
     }).not.toThrow();
   });
+
+  it('stays at current spot when target pano fails to load', async () => {
+    const onApply = vi.fn();
+    const sm = new SpotManager(makeSpots(), onApply, {
+      prepare: (id) => (id === 'riverside' ? Promise.reject(new Error('network')) : Promise.resolve()),
+    });
+    const result = await sm.transitionTo('riverside');
+    expect(result.status).toBe('failed');
+    expect(sm.current).toBe('campsite');
+    expect(sm.busy).toBe(false);
+  });
 });

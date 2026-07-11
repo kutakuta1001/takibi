@@ -23,10 +23,28 @@ const FADE_IN_SECONDS = 1.5;
 // 到着地の環境音を先行フェードインさせるため。「姿より先に音が到着する」体験のコア）。
 const AMBIENCE_LEAD_SECONDS = 0.4;
 
+export interface TransitionResult {
+  status: 'done' | 'failed' | 'ignored';
+}
+
+export interface SpotManagerOptions {
+  /** fadingOut が十分進んだ時点（暗転中）で一度だけ発火する音フック。第3引数が関数の場合はこれと同義。 */
+  onApproach?: (target: Spot) => void;
+  /**
+   * 遷移先の準備を待つフック（例: PanoScene.load()）。fadeOut のアニメーション時間と並行して走らせ、
+   * fadeOut 完了後もまだ終わっていなければ完了を待つ。reject した場合は遷移を中断し出発地に留まる
+   * （現在地は変えず、TransitionResult.status を 'failed' にして即座に busy を解除する）。
+   */
+  prepare?: (id: Spot['id']) => Promise<void>;
+}
+
+type PrepareState = 'pending' | 'ready';
+
 interface PendingTransition {
   target: Spot;
-  resolve: () => void;
+  resolve: (result: TransitionResult) => void;
   approached: boolean;
+  prepareState: PrepareState;
 }
 
 /**
@@ -44,16 +62,27 @@ export class SpotManager {
   private currentSpot: Spot;
   private elapsed = 0;
   private pending: PendingTransition | null = null;
+  private readonly onApproach?: (target: Spot) => void;
+  private readonly prepare?: (id: Spot['id']) => Promise<void>;
 
   constructor(
     private readonly spots: Spot[],
     private readonly onApply: (spot: Spot) => void,
-    private readonly onApproach?: (target: Spot) => void
+    onApproachOrOptions?: ((target: Spot) => void) | SpotManagerOptions
   ) {
     if (spots.length === 0) {
       throw new Error('SpotManager には最低1つの Spot が必要');
     }
     this.currentSpot = spots[0];
+
+    // 第3引数は関数（旧: onApproach 単体）と opts オブジェクト（新: { onApproach?, prepare? }）の
+    // どちらでも受け取れるようにする（後方互換）。
+    if (typeof onApproachOrOptions === 'function') {
+      this.onApproach = onApproachOrOptions;
+    } else if (onApproachOrOptions) {
+      this.onApproach = onApproachOrOptions.onApproach;
+      this.prepare = onApproachOrOptions.prepare;
+    }
   }
 
   get current(): Spot['id'] {
@@ -71,18 +100,59 @@ export class SpotManager {
     return 0;
   }
 
-  transitionTo(id: Spot['id']): Promise<void> {
-    if (this.busy) return Promise.resolve();
-    if (id === this.currentSpot.id) return Promise.resolve();
-    if (!this.currentSpot.destinations.includes(id)) return Promise.resolve();
+  /**
+   * 暗転が完了しているのに、まだ prepare（例: PanoScene.load()）の完了を待っている状態。
+   * main.ts はこれを見て HUD に「向かっている…」を表示する。
+   */
+  get pendingPrepare(): boolean {
+    return (
+      this.state === 'fadingOut' &&
+      this.elapsed >= FADE_OUT_SECONDS &&
+      this.pending !== null &&
+      this.pending.prepareState === 'pending'
+    );
+  }
+
+  transitionTo(id: Spot['id']): Promise<TransitionResult> {
+    if (this.busy) return Promise.resolve({ status: 'ignored' });
+    if (id === this.currentSpot.id) return Promise.resolve({ status: 'ignored' });
+    if (!this.currentSpot.destinations.includes(id)) return Promise.resolve({ status: 'ignored' });
 
     const target = this.spots.find((s) => s.id === id);
-    if (!target) return Promise.resolve();
+    if (!target) return Promise.resolve({ status: 'ignored' });
 
     return new Promise((resolve) => {
       this.state = 'fadingOut';
       this.elapsed = 0;
-      this.pending = { target, resolve, approached: false };
+      // prepare が指定されていない呼び方（既存の使い方）は最初から 'ready' にしておく。
+      // これにより、prepare を使わない限りタイミングは従来どおり update(dt) のみで決まる。
+      const pending: PendingTransition = {
+        target,
+        resolve,
+        approached: false,
+        prepareState: this.prepare ? 'pending' : 'ready',
+      };
+      this.pending = pending;
+
+      if (this.prepare) {
+        this.prepare(id).then(
+          () => {
+            if (this.pending === pending) {
+              pending.prepareState = 'ready';
+            }
+          },
+          () => {
+            // 準備に失敗: 暗転を解除して出発地に留まる。ネットワーク越しの失敗はいつ届くか
+            // 分からないため、fadeOut のアニメーション時間を待たせず即座に確定する。
+            if (this.pending === pending) {
+              this.pending = null;
+              this.state = 'idle';
+              this.elapsed = 0;
+              resolve({ status: 'failed' });
+            }
+          }
+        );
+      }
     });
   }
 
@@ -97,11 +167,11 @@ export class SpotManager {
         this.onApproach?.(pending.target);
       }
 
-      if (this.elapsed >= FADE_OUT_SECONDS) {
-        if (pending) {
-          this.currentSpot = pending.target;
-          this.onApply(pending.target);
-        }
+      // prepare が終わっていなければ、暗転(fadeOpacity=1)を保ったまま待つ
+      // （pendingPrepare を見て main.ts が「向かっている…」を表示する）。
+      if (pending && this.elapsed >= FADE_OUT_SECONDS && pending.prepareState === 'ready') {
+        this.currentSpot = pending.target;
+        this.onApply(pending.target);
         this.state = 'fadingIn';
         this.elapsed = 0;
       }
@@ -113,7 +183,7 @@ export class SpotManager {
       this.state = 'idle';
       this.elapsed = 0;
       this.pending = null;
-      pending?.resolve();
+      pending?.resolve({ status: 'done' });
     }
   }
 }

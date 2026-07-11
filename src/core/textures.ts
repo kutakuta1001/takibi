@@ -40,7 +40,10 @@ function loadTexture(url: string, repeat: number, colorSpace?: THREE.ColorSpace)
 
 /** grass/ground/bark/rock の color・normal・roughness を public/textures/<name>/ から読み込む。 */
 export function loadPBR(name: 'grass' | 'ground' | 'bark' | 'rock', repeat: number): PBRSet {
-  const base = `/textures/${name}`;
+  // 先頭スラッシュ付きの絶対パスだとサブパス配信（GitHub Pages のプロジェクトページ等）で
+  // ドメインルート起点に解決されてしまう（main.ts の panoUrl と同じ理由）。相対パスにして
+  // 常に index.html の配置場所を起点に解決させる。
+  const base = `textures/${name}`;
   return {
     map: loadTexture(`${base}/color.jpg`, repeat, THREE.SRGBColorSpace),
     normalMap: loadTexture(`${base}/normal.jpg`, repeat),

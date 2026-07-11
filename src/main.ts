@@ -7,6 +7,7 @@ import { Title } from './ui/Title';
 import { Credits } from './ui/Credits';
 import { HUD } from './ui/HUD';
 import { IdleWatcher } from './ui/IdleWatcher';
+import { VolumeControl } from './ui/VolumeControl';
 import { PanoScene, SNOWFIELD_NIGHT_GRADING } from './pano/PanoScene';
 import { LookControls } from './pano/LookControls';
 import { SpotManager, type Spot } from './pano/SpotManager';
@@ -291,6 +292,7 @@ function applyAmbientAudio(dayness: number, gustStrength: number): void {
 
 const gs = new GameState();
 const hud = new HUD();
+const volumeControl = new VolumeControl(audio.master);
 const input = new Input();
 const interaction = new Interaction(engine.camera, input, gs, engine.renderer.domElement);
 interaction.onBlocked((message) => hud.flashMessage(message));
@@ -466,6 +468,7 @@ uiRoot.appendChild(fadeOverlay);
 const idleWatcher = new IdleWatcher(IDLE_SECONDS);
 idleWatcher.onChange((idle) => {
   hud.setIdle(idle);
+  volumeControl.setIdle(idle);
   spotButtonsContainer.style.transition = `opacity ${idle ? IDLE_FADE_OUT_SECONDS : IDLE_FADE_IN_SECONDS}s ease`;
   spotButtonsContainer.style.opacity = idle ? '0' : '1';
 });

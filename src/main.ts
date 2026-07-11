@@ -22,6 +22,7 @@ import { Chopping } from './foreground/Chopping';
 import { Fire } from './foreground/Fire';
 import { Cooking } from './foreground/Cooking';
 import { SitSequence } from './foreground/SitSequence';
+import { RestSpot } from './foreground/RestSpot';
 import { Breath } from './foreground/Breath';
 import { AudioEngine } from './audio/AudioEngine';
 import { createWind, createRiver, createBirds, createInsects } from './audio/synths';
@@ -88,6 +89,18 @@ const FIRE_LOOK_DIRECTION = { yaw: 0, pitch: -0.5 };
 // 正面の小さな滝と手前の流れが同時に収まる向きへプレイテストで再調整済み。
 const WATER_DIRECTION = { yaw: 0, pitch: -0.3 };
 const WATER_ANGULAR_RADIUS = 0.15; // rad（約8.6度、水面は的が大きいのでTREE_ANGULAR_RADIUSより広め）
+
+// riverside の「座って眺める」休憩スポット。滝の脇の苔むした岩場・倒木に座り、
+// 正面の滝を眺める向きへ視線が動く（プレイテストで確定した方向）。
+const RIVERSIDE_SEAT_DIRECTION = { yaw: 0.6, pitch: -0.45 };
+const RIVERSIDE_SEAT_ANGULAR_RADIUS = 0.14;
+const RIVERSIDE_VIEW_DIRECTION = { yaw: 0, pitch: -0.18 };
+
+// snowfield の「座って眺める」休憩スポット（山頂の一杯の舞台）。山頂の岩稜に座り、
+// 稜線と谷の展望を眺める向きへ視線が動く（プレイテストで確定した方向）。
+const SNOWFIELD_SEAT_DIRECTION = { yaw: -1.2, pitch: -0.5 };
+const SNOWFIELD_SEAT_ANGULAR_RADIUS = 0.14;
+const SNOWFIELD_VIEW_DIRECTION = { yaw: -1.2, pitch: -0.15 };
 
 const SPOT_LABELS: Record<Spot['id'], string> = {
   campsite: 'キャンプ地',
@@ -336,16 +349,29 @@ const cooking = new Cooking(
   WATER_DIRECTION,
   WATER_ANGULAR_RADIUS
 );
+const riversideRest = new RestSpot(engine.scene, sitSequence, {
+  hotspotDirection: RIVERSIDE_SEAT_DIRECTION,
+  angularRadius: RIVERSIDE_SEAT_ANGULAR_RADIUS,
+  lookDirection: RIVERSIDE_VIEW_DIRECTION,
+});
+// coffeeAware は Task 4（山頂の一杯）で true にする。
+const snowfieldRest = new RestSpot(engine.scene, sitSequence, {
+  hotspotDirection: SNOWFIELD_SEAT_DIRECTION,
+  angularRadius: SNOWFIELD_SEAT_ANGULAR_RADIUS,
+  lookDirection: SNOWFIELD_VIEW_DIRECTION,
+});
 
 /**
  * 伐採・焚き火・ケトルは campsite だけ、水汲みは riverside だけで有効にする。
- * snowfield には体験ホットスポットを置かない（眺めと音に浸る場所）。
+ * riverside/snowfield には「座って眺める」休憩スポット（RestSpot）を置く（snowfield は
+ * campsite で淹れたコーヒーを飲める「山頂の一杯」にもなる）。
  * ホットスポットの登録/解除（レイキャスト対象）だけでなく、焚き火・斧・ケトルの3D表示自体も
  * 切り替える（これらは常にシーンに存在するため、切り替えないと別スポットに透けて見えてしまう）。
  */
 function updateHotspotsForSpot(spotId: Spot['id']): void {
   const atCampsite = spotId === 'campsite';
   const atRiverside = spotId === 'riverside';
+  const atSnowfield = spotId === 'snowfield';
 
   chopping.setVisible(atCampsite);
   fire.setVisible(atCampsite);
@@ -356,6 +382,8 @@ function updateHotspotsForSpot(spotId: Spot['id']): void {
   interaction.remove(fire.interactable);
   interaction.remove(cooking.fireKettleInteractable);
   interaction.remove(cooking.waterHotspot);
+  interaction.remove(riversideRest.hotspot);
+  interaction.remove(snowfieldRest.hotspot);
 
   if (atCampsite) {
     interaction.add(chopping.hotspot);
@@ -363,6 +391,9 @@ function updateHotspotsForSpot(spotId: Spot['id']): void {
     interaction.add(cooking.fireKettleInteractable);
   } else if (atRiverside) {
     interaction.add(cooking.waterHotspot);
+    interaction.add(riversideRest.hotspot);
+  } else if (atSnowfield) {
+    interaction.add(snowfieldRest.hotspot);
   }
 }
 updateHotspotsForSpot(SPOTS[0].id);

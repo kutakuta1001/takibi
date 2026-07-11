@@ -1,5 +1,7 @@
 # Takibi
 
+**公開URL: https://kutakuta1001.github.io/takibi/**
+
 ブラウザで森・川辺のキャンプ体験ができる実写360°パノラマのウェブアプリ。固定視点・
 マウスで見回すだけで、木を切る・焚き火を育てる・水を汲む・コーヒーを淹れて飲む——
 行動が軽く連鎖する達成感を音と情景で味わう。建築・クラフトを楽しむゲームではなく、
@@ -33,16 +35,16 @@ npm run dev
 
 ## 配信手順
 
-`npm run build` で生成される `dist/` は静的ファイルのみで構成されており、任意の静的ホスティング
-（GitHub Pages / Cloudflare Pages / 社内サーバー等）にそのまま配置すれば動作する。
-`vite.config.ts` の `base: './'` によりアセット参照が相対パス化されているため、ドメインの
-サブパス（例: `https://example.com/takibi/`）に配置してもそのまま動く。
+GitHub Pages（`kutakuta1001/takibi` リポジトリ、ソースごと公開）で公開済み。
+**main ブランチへの push で `.github/workflows/deploy.yml` が自動的に
+`npm ci` → `npm run test` → `npm run build` → Pages デプロイを実行する**（手動デプロイ操作は不要）。
 
-1. `npm run build` を実行し、`dist/` フォルダ一式をホスティング先にアップロードする。
-2. `npm run preview` でローカル確認してから配置するとよい（相対パス解決の最終チェック）。
+`dist/` は静的ファイルのみで構成されており、`vite.config.ts` の `base: './'` によりアセット参照が
+相対パス化されているため、GitHub Pages のようなサブパス配信（`https://kutakuta1001.github.io/takibi/`）
+でもそのまま動く。ローカルで配信前の最終チェックをしたい場合は以下。
 
-実際のホスティング先の選定・公開の実行は CEO 確認事項のため、本セッションでは行っていない
-（`handoff.md` 参照）。
+1. `npm run build` を実行する。
+2. `npm run preview` で `dist/` をローカル配信して確認する（相対パス解決の最終チェック）。
 
 ## アーキテクチャ
 

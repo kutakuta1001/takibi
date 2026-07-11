@@ -553,6 +553,9 @@ const title = new Title(
   },
   () => {
     tryUnlockAudio();
+    // 炎動画の play() が自動再生制限で失敗している場合、確実なユーザー操作のこのタイミングで
+    // 一度だけ再試行する（AudioEngine.unlock と同じ考え方）。
+    fire.retryFlameVideo();
   },
   () => {
     credits.toggle();

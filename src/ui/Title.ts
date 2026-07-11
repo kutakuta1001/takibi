@@ -6,6 +6,14 @@ const FAILED_MESSAGE = '読み込みに失敗しました';
 const START_LABEL = 'はじめる';
 const RETRY_LABEL = '再試行';
 const HINT_TEXT = 'マウスドラッグで見回す';
+const MOBILE_WARNING_TEXT = 'このアプリは PC ブラウザ推奨です。タッチでの視点操作には未対応です';
+// タッチ主体の入力（pointer: coarse）かつ画面幅が狭い場合のみ注意文を出す。ブロックはしない
+// （それでも「はじめる」は押せる）。タブレットの横向き利用等、幅が十分あるタッチ端末は対象外。
+const MOBILE_MAX_WIDTH = 900;
+
+function isMobileLikely(): boolean {
+  return window.matchMedia('(pointer: coarse)').matches && window.innerWidth < MOBILE_MAX_WIDTH;
+}
 
 /**
  * タイトル画面。campsite パノラマの読み込み状態を3状態で表す:
@@ -132,6 +140,15 @@ export class Title {
     hint.style.opacity = '0.75';
 
     this.stateArea.append(startButton, hint);
+
+    if (isMobileLikely()) {
+      const warning = document.createElement('div');
+      warning.textContent = MOBILE_WARNING_TEXT;
+      warning.style.fontSize = '0.85rem';
+      warning.style.opacity = '0.7';
+      warning.style.maxWidth = '22rem';
+      this.stateArea.appendChild(warning);
+    }
   }
 
   get currentState(): TitleLoadState {

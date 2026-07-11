@@ -208,6 +208,7 @@ export class Fire {
   private readonly group: THREE.Group;
   private readonly light: THREE.PointLight;
   private readonly flameSprite: THREE.Sprite;
+  private readonly flameVideo: HTMLVideoElement;
   private readonly sparks: Spark[] = [];
   private readonly sparkPoints: THREE.Points;
   private readonly crackle: Synth;
@@ -229,7 +230,9 @@ export class Fire {
     this.glowDecalMaterial = this.buildGroundDecal();
     this.buildStoneRing();
     this.buildLogPile();
-    this.flameSprite = this.buildFlameBillboard();
+    const flame = this.buildFlameBillboard();
+    this.flameSprite = flame.sprite;
+    this.flameVideo = flame.video;
 
     this.light = new THREE.PointLight(LIGHT_COLOR, LIGHT_BASE_INTENSITY, LIGHT_DISTANCE);
     this.light.position.set(0, LIGHT_HEIGHT, 0);
@@ -367,17 +370,21 @@ export class Fire {
     }
   }
 
-  /** CC0/Mixkitの実写炎動画（黒背景）を1枚のビルボードに加算合成する（黒が透明になり炎だけ浮き出る）。 */
-  private buildFlameBillboard(): THREE.Sprite {
+  /**
+   * CC0/Mixkitの実写炎動画（黒背景）を1枚のビルボードに加算合成する（黒が透明になり炎だけ浮き出る）。
+   * ロード自体は元から非同期（video.src設定はブロッキングしない）。onerror・play()失敗時は
+   * ビルボードだけ非表示にし、薪・石・火の粉・光・クラックル音で焚き火が成立するフォールバックに
+   * 委ねる（前景3Dの他要素は影響を受けない）。play()の失敗はほぼ確実にブラウザの自動再生制限
+   * （ユーザー操作前は再生をブロックされる）のため、main.ts が retryFlameVideo() を Title の
+   * 「はじめる」クリック（=確実なユーザー操作）のタイミングで一度だけ呼び直す。
+   */
+  private buildFlameBillboard(): { sprite: THREE.Sprite; video: HTMLVideoElement } {
     const video = document.createElement('video');
     video.src = FLAME_VIDEO_URL;
     video.loop = true;
     video.muted = true;
     video.playsInline = true;
     video.autoplay = true;
-    void video.play().catch(() => {
-      /* ブラウザの自動再生制限。AudioEngine.unlock と同じ Title クリックのタイミングで再試行する。 */
-    });
 
     const texture = new THREE.VideoTexture(video);
     texture.colorSpace = THREE.SRGBColorSpace;
@@ -393,7 +400,30 @@ export class Fire {
     sprite.position.set(0, 0.3, 0);
     sprite.scale.set(FLAME_VIDEO_ASPECT, 1, 1);
     this.group.add(sprite);
-    return sprite;
+
+    video.onerror = () => {
+      sprite.visible = false;
+    };
+    void video.play().catch(() => {
+      sprite.visible = false;
+    });
+
+    return { sprite, video };
+  }
+
+  /**
+   * ユーザー操作のタイミングで炎動画の再生を一度だけ再試行する。成功したらビルボードを
+   * 再表示する（失敗時は何もしない=非表示のまま、他要素のフォールバックで焚き火は成立している）。
+   */
+  retryFlameVideo(): void {
+    void this.flameVideo.play().then(
+      () => {
+        this.flameSprite.visible = true;
+      },
+      () => {
+        /* 再試行も失敗。フォールバックのまま。 */
+      }
+    );
   }
 
   private buildSparkPoints(): THREE.Points {

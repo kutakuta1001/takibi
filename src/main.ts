@@ -11,6 +11,7 @@ import { VolumeControl } from './ui/VolumeControl';
 import { PanoScene, SNOWFIELD_NIGHT_GRADING } from './pano/PanoScene';
 import { LookControls } from './pano/LookControls';
 import { SpotManager, type Spot } from './pano/SpotManager';
+import { computeStarMaskFromImage, type Direction } from './pano/StarMask';
 import { Snowfall } from './pano/Snowfall';
 import { Gusts } from './pano/Gusts';
 import { Grading } from './pano/Grading';
@@ -28,37 +29,30 @@ import { playFootsteps, type Ground } from './audio/footsteps';
 const STAR_COUNT = 800;
 const STAR_RADIUS = 45; // パノラマ球（半径50）の内側
 const STAR_HIDE_DAYNESS = 0.25; // これ以上明るい間（夕方側）は星を完全非表示にする
-// 仰角が低い領域は実写の木々の樹冠にあたるため、星をフェードして木の上に浮いて見えないようにする。
-const STAR_FADE_MIN_ELEVATION = THREE.MathUtils.degToRad(16); // これ未満は完全に隠す
-const STAR_FADE_FULL_ELEVATION = THREE.MathUtils.degToRad(34); // これ以上で完全に見える
 
 /**
  * 夜空の星（v1 world/Sky.ts の buildStarPositions を移植）。上半球のみに均等分布させる。
- * 各星の仰角から木々の樹冠に隠れるべき低仰角ほど暗くなるフェード係数を頂点カラーに焼き込み、
- * AdditiveBlending で加算合成する（値0=無加算=見えない）ことで、シェーダーを書かずに
- * 「空の高い領域だけ星が見える」馴染ませを実現する（Fire.ts の火の粉パーティクルと同じ手法）。
- * campsite/riverside で樹冠の高さが異なるため厳密な写真ベースのマスクではないが、
- * 低仰角の樹冠帯を一律にフェードすることで効果と実装コストのバランスを取った。
+ * どの方向が「空」かは写真ごとに異なるため、ここでは位置だけを均等分布で作り、
+ * 実際にどの星を見せるか（頂点カラー）は各スポットのパノラマ読み込み後に
+ * applyStarMaskForSpot が輝度ベースのマスク（StarMask.ts）で書き込む。
+ * AdditiveBlending で加算合成するため、マスク値0=無加算=見えない、という扱いになる
+ * （Fire.ts の火の粉パーティクルと同じ手法）。
  */
-function buildStarField(): THREE.Points {
+function buildStarField(): { points: THREE.Points; directions: Direction[] } {
   const positions = new Float32Array(STAR_COUNT * 3);
-  const colors = new Float32Array(STAR_COUNT * 3);
+  const colors = new Float32Array(STAR_COUNT * 3); // 初期値0（マスク適用まで非表示のまま安全側に倒す）
+  const directions: Direction[] = [];
   const rand = Alea('takibi-stars');
   for (let i = 0; i < STAR_COUNT; i++) {
     const theta = rand() * Math.PI * 2;
     const phi = Math.acos(2 * rand() - 1);
-    const x = STAR_RADIUS * Math.sin(phi) * Math.cos(theta);
-    const y = Math.abs(STAR_RADIUS * Math.cos(phi));
-    const z = STAR_RADIUS * Math.sin(phi) * Math.sin(theta);
-    positions[i * 3] = x;
-    positions[i * 3 + 1] = y;
-    positions[i * 3 + 2] = z;
-
-    const elevation = Math.asin(THREE.MathUtils.clamp(y / STAR_RADIUS, -1, 1));
-    const fade = THREE.MathUtils.smoothstep(elevation, STAR_FADE_MIN_ELEVATION, STAR_FADE_FULL_ELEVATION);
-    colors[i * 3] = fade;
-    colors[i * 3 + 1] = fade;
-    colors[i * 3 + 2] = fade;
+    const x = Math.sin(phi) * Math.cos(theta);
+    const y = Math.abs(Math.cos(phi));
+    const z = Math.sin(phi) * Math.sin(theta);
+    directions.push({ x, y, z });
+    positions[i * 3] = x * STAR_RADIUS;
+    positions[i * 3 + 1] = y * STAR_RADIUS;
+    positions[i * 3 + 2] = z * STAR_RADIUS;
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -74,7 +68,7 @@ function buildStarField(): THREE.Points {
     blending: THREE.AdditiveBlending,
     toneMapped: false,
   });
-  return new THREE.Points(geometry, material);
+  return { points: new THREE.Points(geometry, material), directions };
 }
 
 // campsite パノラマ内の実際の木の方向（yaw/pitch）。Phase S で forest_slope に差し替えた際、
@@ -204,6 +198,23 @@ engine.camera.position.set(0, 0, 0);
 // （v1 から潜在していた不具合。camera.parent===null のままだと子オブジェクトは常に非表示になる）。
 engine.scene.add(engine.camera);
 
+// 星の位置は写真に依存しないため先に作っておき、各スポットのパノラマ読み込み完了時に
+// その写真の輝度から「空の方向だけ見せる」マスクを計算する（starMasks に spotごとキャッシュ）。
+const stars = buildStarField();
+engine.scene.add(stars.points);
+const starMasks = new Map<Spot['id'], Float32Array>();
+
+/** 現在のスポットの輝度マスクを星の頂点カラーへ書き込む（未計算なら安全側で全非表示）。 */
+function applyStarMaskForSpot(spotId: Spot['id']): void {
+  const mask = starMasks.get(spotId);
+  const colorAttr = stars.points.geometry.getAttribute('color') as THREE.BufferAttribute;
+  for (let i = 0; i < STAR_COUNT; i++) {
+    const value = mask ? mask[i] : 0;
+    colorAttr.setXYZ(i, value, value, value);
+  }
+  colorAttr.needsUpdate = true;
+}
+
 // スポットごとに PanoScene を1つずつ用意し、可視状態の切替でクロスフェード先を表示する
 // （テクスチャの再読込を避けるため、遷移のたびに作り直さない）。
 const pmremGenerator = new THREE.PMREMGenerator(engine.renderer);
@@ -211,14 +222,17 @@ const panoScenes = new Map<Spot['id'], PanoScene>();
 for (const spot of SPOTS) {
   const pano = new PanoScene(
     spot.panoUrl,
-    spot.id === 'campsite'
-      ? (texture) => {
-          // 焚き火の石・薪等の前景3Dを実写の色に馴染ませるため、campsite写真そのものを
-          // 環境マップとして焼き込む（v1のような合成スカイシェーダは不要になった）。
-          engine.scene.environment = pmremGenerator.fromEquirectangular(texture).texture;
-          pmremGenerator.dispose();
-        }
-      : undefined,
+    (texture) => {
+      if (spot.id === 'campsite') {
+        // 焚き火の石・薪等の前景3Dを実写の色に馴染ませるため、campsite写真そのものを
+        // 環境マップとして焼き込む（v1のような合成スカイシェーダは不要になった）。
+        engine.scene.environment = pmremGenerator.fromEquirectangular(texture).texture;
+        pmremGenerator.dispose();
+      }
+      // equirect画像を縮小Canvasへ描いて輝度サンプリングし、空(明るい)方向の星だけ見せる
+      // マスクを作る（樹冠・岩は写真上で暗いため自然に除外される。詳細は StarMask.ts）。
+      starMasks.set(spot.id, computeStarMaskFromImage(texture.image as CanvasImageSource, stars.directions));
+    },
     // snowfield は元写真が非常に明るい雪面主体のため、forest系と同じ夜グレーディングでは
     // 「月夜」らしさが出ない（詳細は PanoScene.ts の SNOWFIELD_NIGHT_GRADING コメント参照）。
     spot.id === 'snowfield' ? SNOWFIELD_NIGHT_GRADING : undefined
@@ -351,8 +365,6 @@ function updateHotspotsForSpot(spotId: Spot['id']): void {
 updateHotspotsForSpot(SPOTS[0].id);
 
 const grading = new Grading();
-const stars = buildStarField();
-engine.scene.add(stars);
 const snowfall = new Snowfall(engine.scene);
 snowfall.setEnabled(SPOTS[0].snowfall);
 const gusts = new Gusts();
@@ -366,6 +378,7 @@ const spotManager = new SpotManager(
       pano.mesh.visible = id === spot.id;
     }
     updateHotspotsForSpot(spot.id);
+    applyStarMaskForSpot(spot.id);
     snowfall.setEnabled(spot.snowfall);
     breath.setEnabled(spot.id === 'snowfield');
     reverb.apply(REVERB_PRESETS[spot.id]);
@@ -515,8 +528,8 @@ engine.onUpdate((dt) => {
   cooking.update(dt);
 
   const starVisible = dayness < STAR_HIDE_DAYNESS;
-  stars.visible = starVisible;
-  (stars.material as THREE.PointsMaterial).opacity = starVisible
+  stars.points.visible = starVisible;
+  (stars.points.material as THREE.PointsMaterial).opacity = starVisible
     ? THREE.MathUtils.clamp(1 - dayness / STAR_HIDE_DAYNESS, 0, 1)
     : 0;
 
@@ -557,6 +570,9 @@ const credits = new Credits();
 const title = new Title(
   () => campsitePano.load(),
   () => {
+    // campsite の読み込みは Title の loading/ready ゲートで既に完了している
+    // （マスクも読み込み完了時のコールバックで計算済み）ので、開始スポットへ即時適用する。
+    applyStarMaskForSpot(SPOTS[0].id);
     engine.start();
   },
   () => {

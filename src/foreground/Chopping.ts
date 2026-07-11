@@ -16,6 +16,23 @@ const AXE_REST_ROTATION_X = 0.3;
 const AXE_DISTANCE = 1.4;
 const AXE_SCALE = 0.55;
 
+// 柄: 頭側が細く握り側が太いわずかなテーパー（実際の斧の柄の形に近づける）。
+const HANDLE_LENGTH = 0.5;
+const HANDLE_RADIUS_TOP = 0.016;
+const HANDLE_RADIUS_BOTTOM = 0.026;
+const HANDLE_COLOR = 0x4a3320;
+// グリップ: 握る側だけ色を変えた短い円柱を重ねて巻き革のような質感差を出す。
+const GRIP_LENGTH = 0.14;
+const GRIP_COLOR = 0x1c140d;
+// 頭部: 柄の上端から横へ突き出す薄い楔（金属質）。四角錐(ConeGeometry, radialSegments=4)を
+// 横向きに倒して薄く潰すことで、丸い槌ではなく刃のある楔形に見せる。
+const HEAD_REACH = 0.22; // 柄からの突き出し長さ（刃先までの距離）
+const HEAD_WIDTH = 0.16; // 刃の上下方向の幅
+const HEAD_THICKNESS = 0.045; // 刃の厚み
+const HEAD_COLOR = 0x6b6f76;
+const HEAD_ROUGHNESS = 0.4;
+const HEAD_METALNESS = 0.8;
+
 /**
  * campsite パノラマ内の実際の木の方向に置いた伐採ホットスポット（v1 systems/Chopping.ts から移植）。
  * 写真の木自体は動かせないため倒木アニメは実装せず、E/クリック4回で伐倒音を鳴らし薪+3を加算する
@@ -72,23 +89,40 @@ export class Chopping {
     }
   }
 
-  /** 画面右下に固定表示する簡易な斧ビューモデル（Box=柄 + Cylinder=刃）。カメラの子として追従させる。 */
+  /**
+   * 画面右下に固定表示する簡易な斧ビューモデル。柄はテーパー付き円柱+握り側の色変化、
+   * 頭部は金属質(metalness/roughness)の薄い楔（四角錐を横向きに倒して潰した形）にし、
+   * 「白い棒」に見えない、丸い槌ではなく刃のある斧に見えることを狙う。カメラの子として追従させる。
+   */
   private buildAxeViewModel(): THREE.Group {
     const group = new THREE.Group();
 
     const handle = new THREE.Mesh(
-      new THREE.BoxGeometry(0.04, 0.5, 0.04),
-      new THREE.MeshStandardMaterial({ color: 0x3d2b1a, roughness: 0.9, metalness: 0 })
+      new THREE.CylinderGeometry(HANDLE_RADIUS_TOP, HANDLE_RADIUS_BOTTOM, HANDLE_LENGTH, 8),
+      new THREE.MeshStandardMaterial({ color: HANDLE_COLOR, roughness: 0.85, metalness: 0 })
     );
-    handle.position.y = 0.25;
+    handle.position.y = HANDLE_LENGTH / 2;
     group.add(handle);
 
-    const head = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.12, 0.12, 0.06, 12),
-      new THREE.MeshStandardMaterial({ color: 0x5c5c60, roughness: 0.75, metalness: 0.55 })
+    const grip = new THREE.Mesh(
+      new THREE.CylinderGeometry(HANDLE_RADIUS_BOTTOM * 1.05, HANDLE_RADIUS_BOTTOM * 1.05, GRIP_LENGTH, 8),
+      new THREE.MeshStandardMaterial({ color: GRIP_COLOR, roughness: 0.95, metalness: 0 })
     );
-    head.rotation.x = Math.PI / 2;
-    head.position.y = 0.5;
+    grip.position.y = GRIP_LENGTH / 2;
+    group.add(grip);
+
+    // ConeGeometry(半径, 高さ, 4面) はデフォルトで頂点が+Y・底面(四角)が-Y側にある。
+    // Z軸回りに-90度回して頂点を+X（柄から外側へ突き出す方向）へ向け、Z方向に薄く潰し、
+    // 底面(=柄との接合部)がX=0に来るよう平行移動して柄の上端に据える。
+    const headGeometry = new THREE.ConeGeometry(HEAD_WIDTH / 2, HEAD_REACH, 4);
+    headGeometry.rotateZ(-Math.PI / 2);
+    headGeometry.scale(1, 1, HEAD_THICKNESS / HEAD_WIDTH);
+    headGeometry.translate(HEAD_REACH / 2, 0, 0);
+    const head = new THREE.Mesh(
+      headGeometry,
+      new THREE.MeshStandardMaterial({ color: HEAD_COLOR, roughness: HEAD_ROUGHNESS, metalness: HEAD_METALNESS })
+    );
+    head.position.y = HANDLE_LENGTH;
     group.add(head);
 
     // 元の (0.35, -0.35, -0.55) と同じ画面上の隅（NDC）を保ったまま AXE_DISTANCE まで遠ざける。

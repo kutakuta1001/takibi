@@ -2,7 +2,27 @@
 
 ## 現在地（2026-07-11）
 
-Phase E1「座る・飲む体験の統合（山頂の一杯）」Task 1〜4 完了（未push・親エージェントが
+Phase D「見つけやすさ（Discoverability）」Task 1〜4 完了（未push・親エージェントが検証後にpush予定）。
+CEOが公開版で「どのシーンで何をやっているか・何ができるのかわからない」と迷った実体験を根拠に、
+以下を追加した:
+- Task 1: `ui/hints.ts`（純関数 nextHint・TDD・全10分岐テスト）+ `ui/AreaTitle.ts`（到着時に
+  場所名+次の一歩を画面上部中央へ表示、ホールド3.5秒+ゆっくりフェードアウト1.5秒。IdleWatcher対象外）
+- Task 2: `pano/HotspotMarker.ts`（暖色の柔らかい光スプライト・呼吸パルス周期3秒±10%・
+  Canvas放射グラデ・AdditiveBlending）。伐採の木・焚き火（薪くべ）・ケトル・水汲み・座り場所2箇所に設置。
+  表示条件はcanInteract||prompt非空、座り中は全消灯、IdleWatcher対象外。初回実装は白すぎ・小さすぎて
+  木漏れ日と紛れたため、色を琥珀色寄りに彩度アップ+サイズ拡大（ANGULAR_SIZE 0.06→0.13）で調整
+- Task 3: `ui/Help.ts`（H キー/HUD右下「?」ボタンで開閉、Esc/H/?で閉じる。操作方法+現在スポットの
+  できること（動的）+体験の流れの紹介文。開いている間はlookControls/interactionを毎フレーム合成で停止）
+- Task 4: Playwrightで初見シナリオを通し確認（開始→伐採→焚き火→水汲み→抽出→雪山へ運搬→山頂で
+  一杯→静かに終わる）。全ステップ実際にクリック/キー操作で完走、pageerrorゼロ。idle消灯でナビ/音量/
+  ヘルプボタンは消えるがマーカーは残ることも確認
+- build / test 63件グリーン（既存52件+hints新規11件）
+- 逸脱: HOTSPOT_DISTANCEをHotspot.tsからexport、directionToPosition/positionToDirectionを
+  共通ヘルパーとして抽出（焚き火・ケトルの実座標からマーカー配置方向を逆算するため）。
+  Interaction.tsにget target()を追加（マーカーのフォーカス判定用）。Cooking.tsにkettlePosition
+  publicフィールドを追加。いずれも既存関数のロジックは変更せず、公開面の追加のみ
+
+Phase E1「座る・飲む体験の統合（山頂の一杯）」Task 1〜4 完了（親エージェントが
 検証後にpush予定）。Cooking の座りシーケンスを SitTimeline（純ロジック・TDD）+
 SitSequence（演出・campsite/riverside/snowfield 共有の単一インスタンス）に切り出し、
 riverside/snowfield に RestSpot（座って眺める）を追加。snowfield の RestSpot は
@@ -68,14 +88,14 @@ R0/R1 完了内容（Task 1〜10 + 5.5、コミット順）:
 
 ## 次のアクション
 
-1. 親エージェントが Phase E1 の差分を検証後 push（`.github/workflows/deploy.yml` で自動デプロイ）
-   → CEO に公開URLでの「山頂の一杯」確認を依頼
-   （https://kutakuta1001.github.io/takibi/ 。campsiteで淹れて飲まずに雪山へ、山頂の岩場で
-   座って飲む→静かに終わることを確認）
+1. 親エージェントが Phase D の差分を検証後 push（`.github/workflows/deploy.yml` で自動デプロイ）
+   → CEO に公開URLでの見つけやすさ改善（到着時のタイトルカード・光のマーカー・Hヘルプ）確認を依頼
+   （https://kutakuta1001.github.io/takibi/ ）
 2. 次フェーズ E2（第4スポット・写真先行調査）着手前に superpowers:writing-plans で新規計画を作成する
    （`docs/superpowers/plans/2026-07-11-e1-sit-and-summit-plan.md` は E1 で完了・経緯として保全）
 
 正典: `docs/superpowers/specs/2026-07-07-panorama-experience-design.md`（設計書）、
+`docs/superpowers/plans/2026-07-11-discoverability-plan.md`（Phase D計画・Task 1〜4）、
 `docs/superpowers/plans/2026-07-11-e1-sit-and-summit-plan.md`（E1計画・Task 1〜4）、
 `docs/superpowers/plans/2026-07-11-r0-r1-release-plan.md`（R0+R1計画・Task 1〜10）、
 `docs/superpowers/plans/2026-07-10-presence-polish-plan.md`（Phase U 計画・U1〜U5）、`ROADMAP.md`。

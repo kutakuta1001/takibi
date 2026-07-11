@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="12" fill="#0d1b2a" />
+  <!-- 薪: 中心で交差する2本の暗い木材 -->
+  <rect x="14" y="49" width="30" height="6" rx="2" fill="#3a2a1c" transform="rotate(-8 29 52)" />
+  <rect x="20" y="49" width="30" height="6" rx="2" fill="#2c2015" transform="rotate(8 35 52)" />
+  <!-- 炎: 外側(橙)+内側(黄)の2層で手描きのゆらぎを表現 -->
+  <path
+    d="M32 54 C21 54 15 45 15 36 C15 25 22 17 27 6 C26 17 33 21 33 28 C33 22 39 19 37 11 C45 18 49 27 49 36 C49 46 42 54 32 54 Z"
+    fill="#ff7a2e"
+  />
+  <path
+    d="M32 47 C25 47 21 41 21 34 C21 27 25 21 29 13 C28 20 32 23 32 28 C32 24 36 21 35 16 C40 21 42 27 42 33 C42 40 38 47 32 47 Z"
+    fill="#ffc95c"
+  />
+</svg>

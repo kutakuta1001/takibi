@@ -99,3 +99,5 @@ R0/R1 完了内容（Task 1〜10 + 5.5、コミット順）:
 `docs/superpowers/plans/2026-07-11-e1-sit-and-summit-plan.md`（E1計画・Task 1〜4）、
 `docs/superpowers/plans/2026-07-11-r0-r1-release-plan.md`（R0+R1計画・Task 1〜10）、
 `docs/superpowers/plans/2026-07-10-presence-polish-plan.md`（Phase U 計画・U1〜U5）、`ROADMAP.md`。
+
+2026-07-11: Phase D（見つけやすさ）を検証し push・デプロイ完了（テスト63件グリーン・公開URL 200）。本日分として改善ロードマップ策定（Codex と4往復・docs/superpowers/plans/2026-07-11-improvement-roadmap.md）→ R0/R1（GitHub Pages 公開: https://kutakuta1001.github.io/takibi/ ）→ E1（山頂の一杯）→ Phase D まですべて公開版に反映済み。次: CEO の公開版確認（マーカーの灯り具合・場所表示の感想）→ E2（第4スポット・写真先行調査）を writing-plans で計画。

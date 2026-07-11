@@ -196,10 +196,9 @@ for (const spot of SPOTS) {
   panoScenes.set(spot.id, pano);
 }
 
-// campsite は起動時に先行ロードする。riverside/snowfield は初回遷移時に SpotManager の
-// prepare フックで待つ（main.ts 側の非同期ロード周りの完成した UI 接続は Title を扱う Task 2 で行う。
-// ここでは失敗時に未処理の Promise rejection にならないよう握り潰すだけにしておく）。
-void panoScenes.get(SPOTS[0].id)!.load().catch(() => {});
+// campsite は起動時に先行ロードする（Title が load() を呼び、loading/ready/failed を表示する）。
+// riverside/snowfield は初回遷移時に SpotManager の prepare フックで待つ。
+const campsitePano = panoScenes.get(SPOTS[0].id)!;
 
 const lookControls = new LookControls(engine.camera, engine.renderer.domElement);
 
@@ -364,6 +363,11 @@ spotButtonsContainer.style.alignItems = 'flex-end';
 spotButtonsContainer.style.gap = '0.6rem';
 spotButtonsContainer.style.opacity = '1';
 spotButtonsContainer.style.transition = `opacity ${IDLE_FADE_IN_SECONDS}s ease`;
+// タイトル表示中（engine.start() 前）は見た目上タイトルの下に隠れているだけでキーボードフォーカスは
+// 素通りしてしまう（Tab 順序が Title の開始ボタンより前に来てしまう）。visibility: hidden は
+// フォーカス対象からも除外されるため、ここで塞いでおく。engine.start() 後の最初のフレームで
+// 下の onUpdate が busy/isSitting に応じて visible に戻す。
+spotButtonsContainer.style.visibility = 'hidden';
 uiRoot.appendChild(spotButtonsContainer);
 
 function makeSpotButton(destinationId: Spot['id']): HTMLButtonElement {
@@ -477,6 +481,7 @@ engine.onUpdate((dt) => {
 
 const credits = new Credits();
 const title = new Title(
+  () => campsitePano.load(),
   () => {
     engine.start();
   },

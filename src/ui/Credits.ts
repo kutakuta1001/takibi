@@ -43,6 +43,10 @@ export class Credits {
   private readonly overlay: HTMLDivElement;
   private visible = false;
 
+  private readonly handleKeyDown = (event: KeyboardEvent): void => {
+    if (event.key === 'Escape') this.hide();
+  };
+
   constructor() {
     this.overlay = document.createElement('div');
     this.overlay.style.position = 'fixed';
@@ -81,6 +85,8 @@ export class Credits {
     }
 
     const closeButton = document.createElement('button');
+    closeButton.className = 'tk-button';
+    closeButton.type = 'button';
     closeButton.textContent = '閉じる';
     closeButton.style.marginTop = '1rem';
     closeButton.style.padding = '0.5rem 1.2rem';
@@ -146,12 +152,14 @@ export class Credits {
     if (this.visible) return;
     this.visible = true;
     document.getElementById('ui-root')?.appendChild(this.overlay);
+    window.addEventListener('keydown', this.handleKeyDown);
   }
 
   hide(): void {
     if (!this.visible) return;
     this.visible = false;
     this.overlay.remove();
+    window.removeEventListener('keydown', this.handleKeyDown);
   }
 
   toggle(): void {

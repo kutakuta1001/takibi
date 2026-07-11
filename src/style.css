@@ -13,3 +13,13 @@ body {
   height: 100%;
   pointer-events: none;
 }
+
+/* タイトル/クレジットの開始・再試行・閉じるボタン共通。キーボード操作時のみリングを出す。 */
+.tk-button {
+  cursor: pointer;
+}
+
+.tk-button:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}

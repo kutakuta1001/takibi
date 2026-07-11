@@ -19,7 +19,9 @@ import { Snowfall } from './pano/Snowfall';
 import { Gusts } from './pano/Gusts';
 import { Grading } from './pano/Grading';
 import { GameState } from './systems/GameState';
-import { Interaction } from './systems/Interaction';
+import { Interaction, type Interactable } from './systems/Interaction';
+import { positionToDirection } from './pano/Hotspot';
+import { HotspotMarker } from './pano/HotspotMarker';
 import { Chopping } from './foreground/Chopping';
 import { Fire } from './foreground/Fire';
 import { Cooking } from './foreground/Cooking';
@@ -366,6 +368,31 @@ const snowfieldRest = new RestSpot(engine.scene, sitSequence, {
   coffeeAware: true,
 });
 
+// インタラクト可能な場所に灯す、柔らかい光のマーカー（見つけやすさ）。伐採の木・水汲み・座り場所は
+// Hotspot と同じ方向+既定距離（HOTSPOT_DISTANCE）に、焚き火の薪くべ・ケトルは実座標
+// （FIRE_POSITION/cooking.kettlePosition）から方向+距離を逆算して同じ場所に光を置く。
+const treeMarker = new HotspotMarker(engine.scene, TREE_DIRECTION);
+const fireMarkerPlacement = positionToDirection(FIRE_POSITION);
+const fireMarker = new HotspotMarker(engine.scene, fireMarkerPlacement.direction, fireMarkerPlacement.distance);
+const kettleMarkerPlacement = positionToDirection(cooking.kettlePosition);
+const kettleMarker = new HotspotMarker(engine.scene, kettleMarkerPlacement.direction, kettleMarkerPlacement.distance);
+const waterMarker = new HotspotMarker(engine.scene, WATER_DIRECTION);
+const riversideSeatMarker = new HotspotMarker(engine.scene, RIVERSIDE_SEAT_DIRECTION);
+const snowfieldSeatMarker = new HotspotMarker(engine.scene, SNOWFIELD_SEAT_DIRECTION);
+
+// マーカー1つぶんの設定（対象Interactable + どのスポットにいるときだけ判定するか）。
+// 表示条件はそのInteractableのcanInteractがtrueか、prompt(gs)が非空のとき（座り場所・水汲み・
+// 焚き火の薪くべ・ケトルは大半の状態でpromptが非空のため、そのスポットにいる間はほぼ常灯になる。
+// 伐採の木だけは倒した後にprompt/canInteractがともに空/falseになり消灯する）。
+const markerBindings: Array<{ marker: HotspotMarker; interactable: Interactable; spotId: Spot['id'] }> = [
+  { marker: treeMarker, interactable: chopping.hotspot, spotId: 'campsite' },
+  { marker: fireMarker, interactable: fire.interactable, spotId: 'campsite' },
+  { marker: kettleMarker, interactable: cooking.fireKettleInteractable, spotId: 'campsite' },
+  { marker: waterMarker, interactable: cooking.waterHotspot, spotId: 'riverside' },
+  { marker: riversideSeatMarker, interactable: riversideRest.hotspot, spotId: 'riverside' },
+  { marker: snowfieldSeatMarker, interactable: snowfieldRest.hotspot, spotId: 'snowfield' },
+];
+
 /**
  * 伐採・焚き火・ケトルは campsite だけ、水汲みは riverside だけで有効にする。
  * riverside/snowfield には「座って眺める」休憩スポット（RestSpot）を置く（snowfield は
@@ -591,6 +618,19 @@ engine.onUpdate((dt) => {
 
   const { prompt } = interaction.update();
   hud.setPrompt(prompt);
+
+  // マーカーは IdleWatcher の消灯対象外、座り中は全マーカー非表示。
+  const focusedTarget = interaction.target;
+  const currentSpotId = spotManager.current;
+  for (const { marker, interactable, spotId } of markerBindings) {
+    const available =
+      !cooking.isSitting &&
+      spotId === currentSpotId &&
+      (interactable.canInteract(gs) || interactable.prompt(gs) !== '');
+    marker.setAvailable(available);
+    marker.setFocused(focusedTarget === interactable && prompt !== null);
+    marker.update(dt, engine.camera);
+  }
 });
 
 /**

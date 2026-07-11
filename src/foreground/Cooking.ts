@@ -25,6 +25,7 @@ const KETTLE_STEAM_MAX_RISE = 0.9;
 export class Cooking {
   readonly fireKettleInteractable: Interactable;
   readonly waterHotspot: Hotspot;
+  readonly kettlePosition: THREE.Vector3; // HotspotMarker（main.ts）がケトルの実座標を必要とするため公開
 
   private spotVisible = true; // campsite にいる間だけ true（ケトルは焚き火の位置にあるため）
 
@@ -47,6 +48,7 @@ export class Cooking {
       firePosition.y + KETTLE_HEIGHT_ABOVE_FIRE,
       firePosition.z
     );
+    this.kettlePosition = kettlePosition;
 
     this.kettleGroup = this.buildKettleMesh();
     this.kettleGroup.position.copy(kettlePosition);

@@ -61,6 +61,11 @@ export class Interaction {
     this.blockedCallbacks.push(cb);
   }
 
+  /** 現在視線が合っている対象（HotspotMarker の setFocused 判定に main.ts が使う）。 */
+  get target(): Interactable | null {
+    return this.currentTarget;
+  }
+
   /** 座りシーケンスなど、演出中に一時的にレイキャスト判定とE/クリックを無効化する。 */
   setEnabled(enabled: boolean): void {
     this.enabled = enabled;

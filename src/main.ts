@@ -8,6 +8,7 @@ import { Credits } from './ui/Credits';
 import { HUD } from './ui/HUD';
 import { IdleWatcher } from './ui/IdleWatcher';
 import { VolumeControl } from './ui/VolumeControl';
+import { DebugOverlay } from './ui/DebugOverlay';
 import { PanoScene, SNOWFIELD_NIGHT_GRADING } from './pano/PanoScene';
 import { LookControls } from './pano/LookControls';
 import { SpotManager, type Spot } from './pano/SpotManager';
@@ -396,6 +397,9 @@ const spotManager = new SpotManager(
   }
 );
 
+// ?debug=1 のときだけ表示するfps/レンダリング統計オーバーレイ（デフォルトはDOMを作らず無影響）。
+const debugOverlay = new DebugOverlay(engine.renderer, () => SPOT_LABELS[spotManager.current]);
+
 // 画面端の遷移先ボタン群。専用の要素を #ui-root に直接追加する（HUD.ts はプロンプト/所持品トレイ用）。
 // ハブ&スポーク構成のため、現在スポットの destinations 数に応じて複数ボタンを縦に並べる
 // （campsite にいるときは「川辺へ →」「雪山へ →」の2つ、riverside/snowfield では1つ）。
@@ -507,6 +511,7 @@ engine.onUpdate((dt) => {
   if (gated === null) return; // タブ非表示中: 更新も描画対象の状態変更も一切行わない
   dt = gated; // 復帰直後の1フレームだけ RESUME_DT_CLAMP に差し替えられている
 
+  debugOverlay.recordFrame(dt);
   idleWatcher.update(dt);
   spotManager.update(dt);
   // スポット遷移中・座って飲む演出中はユーザーのドラッグ見回しを止める

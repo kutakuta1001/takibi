@@ -101,3 +101,9 @@ R0/R1 完了内容（Task 1〜10 + 5.5、コミット順）:
 `docs/superpowers/plans/2026-07-10-presence-polish-plan.md`（Phase U 計画・U1〜U5）、`ROADMAP.md`。
 
 2026-07-11: Phase D（見つけやすさ）を検証し push・デプロイ完了（テスト63件グリーン・公開URL 200）。本日分として改善ロードマップ策定（Codex と4往復・docs/superpowers/plans/2026-07-11-improvement-roadmap.md）→ R0/R1（GitHub Pages 公開: https://kutakuta1001.github.io/takibi/ ）→ E1（山頂の一杯）→ Phase D まですべて公開版に反映済み。次: CEO の公開版確認（マーカーの灯り具合・場所表示の感想）→ E2（第4スポット・写真先行調査）を writing-plans で計画。
+
+2026-07-11（続）: CEO フィードバック（音と画像は高評価・E キー不要・選択肢でイベントが進む
+ゲームのような仕様への転換希望）を受け brainstorming 実施。サウンドノベル型・ゆるやかな分岐・
+一日の流れ（午後→夕→夜→朝）・追加スポット候補は湖畔と森の小道、で CEO 設計承認済み。
+設計書 v3: `docs/superpowers/specs/2026-07-11-sound-novel-pivot-design.md`（CEO の本文レビュー待ち）。
+次: CEO レビュー → superpowers:writing-plans で N1 計画作成（E2 の写真調査は N3 に統合）。

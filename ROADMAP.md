@@ -1,8 +1,9 @@
 # Takibi ロードマップ
 
-体験: 実写360°パノラマのキャンプ体験（固定視点・見回しのみ・癒し+軽い連鎖・PC優先）
-正典: `docs/superpowers/specs/2026-07-07-panorama-experience-design.md`（v2 設計書）
-計画: `docs/superpowers/plans/2026-07-07-panorama-pivot-plan.md`（Task P1〜P7）
+体験: 実写360°パノラマのキャンプ体験（固定視点・見回しのみ・選択肢で進む静かなサウンドノベル・PC優先）
+正典: `docs/superpowers/specs/2026-07-11-sound-novel-pivot-design.md`（v3・操作モデルと進行構造の正）、
+`docs/superpowers/specs/2026-07-07-panorama-experience-design.md`（v2・映像・音・写真原則の正）
+計画: `docs/superpowers/plans/2026-07-11-n1-sound-novel-plan.md`（N1・Task 1〜7）ほか各フェーズ計画
 
 方向転換（2026-07-07 CEO 判断）: 没入感を最優先し、3D歩行世界を実写パノラマに置き換える。
 音と体験連鎖は高評価のため維持。旧3D歩行版は `archive/3d-walkable` ブランチに保全

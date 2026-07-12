@@ -2,7 +2,7 @@
 
 ## 現在地（2026-07-12）
 
-N1（サウンドノベル化）完了。Task 1〜6 実装 + レビュー修正3件:
+N1（サウンドノベル化）完了。Task 1〜7（実装 6 + 正典更新 1）+ レビュー修正3件:
 - StoryEngine/scenario（TDD・10テスト）・StoryPanel・Direction を導入し、main.ts 切替で
   E キー/ホットスポット/ナビボタン/中央プロンプト/`ui/hints.ts` を全廃
 - レビュー修正3件: StoryPanel の setHidden タイマー競合、SitSequence.start 無視時の

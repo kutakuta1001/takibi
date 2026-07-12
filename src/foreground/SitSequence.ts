@@ -52,14 +52,18 @@ export class SitSequence {
     return this.timeline?.active ?? false;
   }
 
-  /** active 中の start は無視する（座りは同時に1つ）。onEnd は立ち上がり完了時に一度だけ呼ばれる。 */
+  /** active 中の start は無視する（座りは同時に1つ）。ただし onEnd だけは即座に呼び、
+   * 呼び出し側（Direction.run の await）を宙に浮かせない。 */
   start(opts: {
     lookDirection: HotspotDirection;
     durationSeconds?: number;
     coffee?: GameState;
     onEnd?: () => void;
   }): void {
-    if (this.active) return;
+    if (this.active) {
+      opts.onEnd?.();
+      return;
+    }
     this.onEndCallback = opts.onEnd;
 
     this.coffee = opts.coffee;

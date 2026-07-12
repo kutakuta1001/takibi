@@ -11,6 +11,7 @@ export class StoryPanel {
   private readonly textEl: HTMLDivElement;
   private readonly choicesEl: HTMLDivElement;
   private hidden = true; // タイトル画面の間は隠しておく（engine.start 後に main.ts が解除）
+  private visibilityTimerId: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     this.container = document.createElement('div');
@@ -85,11 +86,18 @@ export class StoryPanel {
   setHidden(hidden: boolean): void {
     if (this.hidden === hidden) return;
     this.hidden = hidden;
+    // 直前の hide タイマーが残っていると、後続の show/hide より遅れて発火し
+    // フェード中の visibility を誤って上書きしてしまうため、遷移ごとに必ず破棄する
+    if (this.visibilityTimerId !== null) {
+      clearTimeout(this.visibilityTimerId);
+      this.visibilityTimerId = null;
+    }
     this.container.style.opacity = hidden ? '0' : '1';
     // visibility はフェード完了を待たず即時に切り替えない（Tab フォーカスだけ即時に塞ぐ）
     if (hidden) {
       this.container.style.pointerEvents = 'none';
-      window.setTimeout(() => {
+      this.visibilityTimerId = window.setTimeout(() => {
+        this.visibilityTimerId = null;
         if (this.hidden) this.container.style.visibility = 'hidden';
       }, TEXT_FADE_SECONDS * 1000);
     } else {

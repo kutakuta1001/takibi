@@ -407,9 +407,13 @@ function refreshStory(narration?: string): void {
 async function chooseStory(choice: StoryChoice): Promise<void> {
   if (direction.busy || spotManager.busy || cooking.isSitting) return;
   storyPanel.setChoicesVisible(false);
-  await direction.run(choice);
-  storyPanel.setChoicesVisible(true);
-  refreshStory(choice.narration);
+  try {
+    await direction.run(choice);
+  } finally {
+    // 万一演出が reject しても選択肢を出し直す（選択肢が消えたままになるのが唯一の復旧不能状態のため）
+    storyPanel.setChoicesVisible(true);
+    refreshStory(choice.narration);
+  }
 }
 
 gs.on('logs-changed', () => refreshStory());

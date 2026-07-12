@@ -97,6 +97,23 @@ export class Cooking {
     this.spotVisible = visible;
   }
 
+  /** 選択肢「川の水を汲む」（旧 waterHotspot.interact と同じ処理）。 */
+  fillKettle(): void {
+    if (this.gs.fillKettle()) {
+      playWaterFill(this.audio.ctx, this.audio.master);
+    }
+  }
+
+  /** 選択肢「ケトルを火にかける」。 */
+  putOnFire(): void {
+    this.gs.putKettleOnFire();
+  }
+
+  /** 選択肢「火のそばに座って一杯を飲む」。 */
+  sitAndDrink(onEnd?: () => void): void {
+    this.sitSequence.start({ lookDirection: this.fireLookDirection, coffee: this.gs, onEnd });
+  }
+
   update(dt: number): void {
     const brewing = this.gs.kettle === 'onFire' || this.gs.kettle === 'ready';
     this.kettleGroup.visible = this.spotVisible && brewing;

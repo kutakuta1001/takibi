@@ -342,8 +342,9 @@ refreshInventory();
 const chopping = new Chopping(engine.scene, engine.camera, audio, gs, TREE_DIRECTION, TREE_ANGULAR_RADIUS);
 const fire = new Fire(engine.scene, gs, audio, FIRE_POSITION);
 // 座って眺める/飲む演出は campsite(Cooking)・riverside/snowfield(RestSpot) で共有する単一インスタンス
-// （座りは同時に1つ。lookControls/interaction のロックもここに集約される）。
-const sitSequence = new SitSequence(lookControls, interaction, engine.camera, audio);
+// （座りは同時に1つ。lookControls のロックもここに集約される。E/クリック抑止は main.ts が毎フレーム
+// interaction.setEnabled(!cooking.isSitting && !help.isOpen) で合成する）。
+const sitSequence = new SitSequence(lookControls, engine.camera, audio);
 const cooking = new Cooking(
   gs,
   hud,

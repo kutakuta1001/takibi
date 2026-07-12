@@ -10,6 +10,7 @@ const LOGS_AWARDED = 3;
 const AXE_SWING_DURATION = 0.3; // seconds
 const AXE_SWING_ANGLE = (50 * Math.PI) / 180;
 const AXE_REST_ROTATION_X = 0.3;
+const FELL_SWING_INTERVAL = 0.9; // 自動伐採の一振りの間隔（秒）
 // v1 は距離0.55・スケール1のまま（カメラがsceneに未登録で描画されておらず見た目未検証だった）。
 // 実際に描画されると画面の大半を占める大きさだったため、遠ざけて縮小し、
 // 画面右下の隅にちらっと見える控えめなビューモデルに調整した。
@@ -45,7 +46,12 @@ export class Chopping {
   private readonly axeGroup: THREE.Group;
   private axeSwingElapsed: number | null = null;
   private hitsRemaining = CHOPPABLE_HITS;
-  private felled = false;
+  private treeFelled = false;
+  private fellSequence: { timer: number; resolve: () => void } | null = null;
+
+  get felled(): boolean {
+    return this.treeFelled;
+  }
 
   constructor(
     scene: THREE.Scene,
@@ -56,8 +62,8 @@ export class Chopping {
     angularRadius: number
   ) {
     this.hotspot = new Hotspot(direction, angularRadius, {
-      prompt: () => (this.felled ? '' : `Eで木を切る（あと${this.hitsRemaining}回）`),
-      canInteract: () => !this.felled,
+      prompt: () => (this.treeFelled ? '' : `Eで木を切る（あと${this.hitsRemaining}回）`),
+      canInteract: () => !this.treeFelled,
       interact: () => this.onChop(),
     });
     // レイキャスト対象の matrixWorld を更新させるため、非表示でもシーングラフに加える必要がある
@@ -75,6 +81,15 @@ export class Chopping {
 
   update(dt: number): void {
     this.updateAxeSwing(dt);
+    this.updateFellSequence(dt);
+  }
+
+  /** 選択肢「木を切る」の自動演出。一定間隔で残り回数ぶん振り、伐倒音と薪加算（既存 onChop）まで進める。 */
+  fell(): Promise<void> {
+    if (this.treeFelled || this.fellSequence) return Promise.resolve();
+    return new Promise((resolve) => {
+      this.fellSequence = { timer: 0, resolve };
+    });
   }
 
   private onChop(): void {
@@ -83,9 +98,22 @@ export class Chopping {
     this.hitsRemaining -= 1;
 
     if (this.hitsRemaining <= 0) {
-      this.felled = true;
+      this.treeFelled = true;
       playTreeFall(this.audio.ctx, this.audio.master);
       this.gs.addLogs(LOGS_AWARDED);
+    }
+  }
+
+  private updateFellSequence(dt: number): void {
+    const seq = this.fellSequence;
+    if (!seq) return;
+    seq.timer -= dt;
+    if (seq.timer > 0) return;
+    seq.timer = FELL_SWING_INTERVAL;
+    this.onChop(); // 一振り（音 + スイング + 残数減。最後の一振りで伐倒音 + 薪加算まで既存ロジックが走る）
+    if (this.treeFelled) {
+      this.fellSequence = null;
+      seq.resolve();
     }
   }
 

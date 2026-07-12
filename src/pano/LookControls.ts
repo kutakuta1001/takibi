@@ -64,7 +64,7 @@ export class LookControls {
   private readonly onPointerDown = (e: PointerEvent): void => {
     if (!this.enabled) return;
     this.dragging = true;
-    this.animation = null;
+    this.cancelAnimation();
     this.swayFade = 0; // ドラッグ開始で呼吸揺らぎを即座にフェードアウト
     this.yawVelocity = 0;
     this.pitchVelocity = 0;
@@ -138,6 +138,7 @@ export class LookControls {
   /** 視点を指定の yaw/pitch へ滑らかに動かす（座って飲む演出など）。完了時に Promise が解決する。 */
   lookAt(yaw: number, pitch: number, seconds: number): Promise<void> {
     return new Promise((resolve) => {
+      this.cancelAnimation();
       this.dragging = false;
       this.yawVelocity = 0;
       this.pitchVelocity = 0;
@@ -152,6 +153,14 @@ export class LookControls {
         resolve,
       };
     });
+  }
+
+  /** 進行中の lookAt アニメーションを中断する。await 側を進めるため必ず resolve する。 */
+  private cancelAnimation(): void {
+    if (this.animation) {
+      this.animation.resolve();
+      this.animation = null;
+    }
   }
 
   private updateAnimation(dt: number): void {

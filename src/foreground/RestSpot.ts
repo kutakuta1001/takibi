@@ -44,9 +44,15 @@ export class RestSpot {
   }
 
   private handleInteract(gs: GameState): void {
+    this.sit(gs);
+  }
+
+  /** 選択肢「腰を下ろして眺める / 一杯を飲む」。coffeeAware かつ kettle==='ready' なら山頂の一杯になる。 */
+  sit(gs: GameState, onEnd?: () => void): void {
     this.sitSequence.start({
       lookDirection: this.opts.lookDirection,
       coffee: this.isCoffeeMoment(gs) ? gs : undefined,
+      onEnd,
     });
   }
 }

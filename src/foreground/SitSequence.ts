@@ -4,7 +4,6 @@ import { playSip } from '../audio/synths';
 import type { HotspotDirection } from '../pano/Hotspot';
 import type { LookControls } from '../pano/LookControls';
 import type { GameState } from '../systems/GameState';
-import type { Interaction } from '../systems/Interaction';
 import { SitTimeline } from './SitTimeline';
 
 const SIT_TRANSITION_SECONDS = 1;
@@ -36,12 +35,12 @@ export class SitSequence {
   private coffee: GameState | undefined;
   private savedYaw = 0;
   private savedPitch = 0;
+  private onEndCallback: (() => void) | undefined;
 
   private readonly viewSteam: THREE.Sprite;
 
   constructor(
     private readonly lookControls: LookControls,
-    private readonly interaction: Interaction,
     camera: THREE.Camera,
     private readonly audio: AudioEngine
   ) {
@@ -53,9 +52,15 @@ export class SitSequence {
     return this.timeline?.active ?? false;
   }
 
-  /** active 中の start は無視する（座りは同時に1つ）。 */
-  start(opts: { lookDirection: HotspotDirection; durationSeconds?: number; coffee?: GameState }): void {
+  /** active 中の start は無視する（座りは同時に1つ）。onEnd は立ち上がり完了時に一度だけ呼ばれる。 */
+  start(opts: {
+    lookDirection: HotspotDirection;
+    durationSeconds?: number;
+    coffee?: GameState;
+    onEnd?: () => void;
+  }): void {
     if (this.active) return;
+    this.onEndCallback = opts.onEnd;
 
     this.coffee = opts.coffee;
     this.timeline = new SitTimeline({
@@ -66,7 +71,6 @@ export class SitSequence {
     this.savedYaw = this.lookControls.currentYaw;
     this.savedPitch = this.lookControls.currentPitch;
 
-    this.interaction.setEnabled(false);
     this.lookControls.enabled = false;
     void this.lookControls.lookAt(opts.lookDirection.yaw, opts.lookDirection.pitch, SIT_TRANSITION_SECONDS);
 
@@ -96,11 +100,13 @@ export class SitSequence {
 
   private end(): void {
     this.viewSteam.visible = false;
-    this.interaction.setEnabled(true);
     this.lookControls.enabled = true;
     this.coffee?.drinkCoffee();
     this.timeline = null;
     this.coffee = undefined;
+    const onEnd = this.onEndCallback;
+    this.onEndCallback = undefined;
+    onEnd?.();
   }
 
   /** 座って眺める/飲む間だけ画面下部に見える固定の湯気スプライト（コーヒー付きの座りのみ表示）。 */

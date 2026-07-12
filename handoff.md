@@ -1,6 +1,16 @@
 # handoff.md
 
-## 現在地（2026-07-11）
+## 現在地（2026-07-12）
+
+N1（サウンドノベル化）完了。Task 1〜6 実装 + レビュー修正3件:
+- StoryEngine/scenario（TDD・10テスト）・StoryPanel・Direction を導入し、main.ts 切替で
+  E キー/ホットスポット/ナビボタン/中央プロンプト/`ui/hints.ts` を全廃
+- レビュー修正3件: StoryPanel の setHidden タイマー競合、SitSequence.start 無視時の
+  onEnd 即時解決、lastFireLit 監視のナレーション上書き
+- ブラウザ通し12/12 PASS（pageerrorゼロ）・build / test 62件グリーン（73件 - hints廃止分11件）
+- 未push（最終ブランチレビュー後にpush判断。コミット範囲 46452ff..3d8f0aa on main）
+
+## 現在地（2026-07-11、経緯として保全）
 
 Phase D「見つけやすさ（Discoverability）」Task 1〜4 完了（未push・親エージェントが検証後にpush予定）。
 CEOが公開版で「どのシーンで何をやっているか・何ができるのかわからない」と迷った実体験を根拠に、
@@ -88,17 +98,19 @@ R0/R1 完了内容（Task 1〜10 + 5.5、コミット順）:
 
 ## 次のアクション
 
-1. 親エージェントが Phase D の差分を検証後 push（`.github/workflows/deploy.yml` で自動デプロイ）
-   → CEO に公開URLでの見つけやすさ改善（到着時のタイトルカード・光のマーカー・Hヘルプ）確認を依頼
-   （https://kutakuta1001.github.io/takibi/ ）
-2. 次フェーズ E2（第4スポット・写真先行調査）着手前に superpowers:writing-plans で新規計画を作成する
-   （`docs/superpowers/plans/2026-07-11-e1-sit-and-summit-plan.md` は E1 で完了・経緯として保全）
+1. N1 の最終ブランチレビュー（Opus 4.8）→ CEO 確認 → push 判断
+   （`.github/workflows/deploy.yml` で自動デプロイ・https://kutakuta1001.github.io/takibi/ ）
+2. 次フェーズ N2（時間帯の物語駆動化: Grading プリセット + 朝 + 雪山フィナーレ + 幕）着手前に
+   superpowers:writing-plans で新規計画を作成する（E2 の写真調査は N3 に統合済み）
 
-正典: `docs/superpowers/specs/2026-07-07-panorama-experience-design.md`（設計書）、
-`docs/superpowers/plans/2026-07-11-discoverability-plan.md`（Phase D計画・Task 1〜4）、
-`docs/superpowers/plans/2026-07-11-e1-sit-and-summit-plan.md`（E1計画・Task 1〜4）、
-`docs/superpowers/plans/2026-07-11-r0-r1-release-plan.md`（R0+R1計画・Task 1〜10）、
-`docs/superpowers/plans/2026-07-10-presence-polish-plan.md`（Phase U 計画・U1〜U5）、`ROADMAP.md`。
+正典: `docs/superpowers/specs/2026-07-11-sound-novel-pivot-design.md`（v3設計書・操作モデルと
+進行構造の正）、`docs/superpowers/specs/2026-07-07-panorama-experience-design.md`（v2設計書・
+映像・音・写真原則の正）、`docs/superpowers/plans/2026-07-11-n1-sound-novel-plan.md`
+（N1計画・Task 1〜7）、`docs/superpowers/plans/2026-07-11-discoverability-plan.md`
+（Phase D計画・Task 1〜4）、`docs/superpowers/plans/2026-07-11-e1-sit-and-summit-plan.md`
+（E1計画・Task 1〜4）、`docs/superpowers/plans/2026-07-11-r0-r1-release-plan.md`
+（R0+R1計画・Task 1〜10）、`docs/superpowers/plans/2026-07-10-presence-polish-plan.md`
+（Phase U 計画・U1〜U5）、`ROADMAP.md`。
 
 2026-07-11: Phase D（見つけやすさ）を検証し push・デプロイ完了（テスト63件グリーン・公開URL 200）。本日分として改善ロードマップ策定（Codex と4往復・docs/superpowers/plans/2026-07-11-improvement-roadmap.md）→ R0/R1（GitHub Pages 公開: https://kutakuta1001.github.io/takibi/ ）→ E1（山頂の一杯）→ Phase D まですべて公開版に反映済み。次: CEO の公開版確認（マーカーの灯り具合・場所表示の感想）→ E2（第4スポット・写真先行調査）を writing-plans で計画。
 
@@ -109,3 +121,11 @@ R0/R1 完了内容（Task 1〜10 + 5.5、コミット順）:
 PC推奨維持も CEO 確定済み）。N1 実装計画を作成済み:
 `docs/superpowers/plans/2026-07-11-n1-sound-novel-plan.md`（Task 1〜7）。
 次: N1 実行（subagent-driven-development 推奨）→ 完了後 N2 計画（E2 の写真調査は N3 に統合）。
+
+2026-07-12: N1（サウンドノベル化）Task 1〜7 完了。StoryEngine/scenario（TDD・10テスト）・
+StoryPanel・Direction・main.ts 切替で E キー/ホットスポット/ナビボタン/中央プロンプト/
+`ui/hints.ts` を全廃。レビュー修正3件（StoryPanel setHidden タイマー競合、SitSequence.start
+無視時の onEnd 即時解決、lastFireLit 監視のナレーション上書き）。ブラウザ通し12/12 PASS
+（pageerrorゼロ）・build / test 62件グリーン（73件 - hints廃止分11件）。未push（最終ブランチ
+レビュー後に push 判断）。CLAUDE.md / ROADMAP.md を v3 設計に合わせて更新（正典順位・写真予算・
+体験の判断基準・N1〜N3 フェーズ追記）。次: 最終ブランチレビュー → CEO 確認 → N2 計画（writing-plans）。

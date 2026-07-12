@@ -583,11 +583,14 @@ engine.onUpdate((dt) => {
   }
 
   // 火の消え際でも本文が追従するよう検出する（選択肢経由の変化は gs.on/chooseStory 側で対応済み）。
+  // 消える方向（lit→unlit）だけを見る: 点く方向は常に feedFire（選択肢）経由でしか起こらず、
+  // chooseStory が choice.narration で直後に上書きするため、ここでも拾うと1フレーム後に
+  // その narration を横取りして消してしまう（実際に発生した不具合。N1 Task 6 で発見）。
   const fireLitNow = gs.fireFuel > 0;
-  if (fireLitNow !== lastFireLit) {
-    lastFireLit = fireLitNow;
+  if (!fireLitNow && lastFireLit) {
     refreshStory();
   }
+  lastFireLit = fireLitNow;
 
   // 座り・スポット遷移・ヘルプ表示中はパネルごと静かに消す。
   storyPanel.setHidden(spotManager.busy || cooking.isSitting || help.isOpen);

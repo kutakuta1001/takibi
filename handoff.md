@@ -105,5 +105,7 @@ R0/R1 完了内容（Task 1〜10 + 5.5、コミット順）:
 2026-07-11（続）: CEO フィードバック（音と画像は高評価・E キー不要・選択肢でイベントが進む
 ゲームのような仕様への転換希望）を受け brainstorming 実施。サウンドノベル型・ゆるやかな分岐・
 一日の流れ（午後→夕→夜→朝）・追加スポット候補は湖畔と森の小道、で CEO 設計承認済み。
-設計書 v3: `docs/superpowers/specs/2026-07-11-sound-novel-pivot-design.md`（CEO の本文レビュー待ち）。
-次: CEO レビュー → superpowers:writing-plans で N1 計画作成（E2 の写真調査は N3 に統合）。
+設計書 v3: `docs/superpowers/specs/2026-07-11-sound-novel-pivot-design.md`（文体=情景のみ・
+PC推奨維持も CEO 確定済み）。N1 実装計画を作成済み:
+`docs/superpowers/plans/2026-07-11-n1-sound-novel-plan.md`（Task 1〜7）。
+次: N1 実行（subagent-driven-development 推奨）→ 完了後 N2 計画（E2 の写真調査は N3 に統合）。

@@ -4,7 +4,6 @@ import type { AudioEngine } from '../audio/AudioEngine';
 import { createFireCrackle, type Synth } from '../audio/synths';
 import { loadPBR } from '../core/textures';
 import type { GameState } from '../systems/GameState';
-import type { Interactable } from '../systems/Interaction';
 
 const STONE_COUNT = 8;
 const STONE_RING_RADIUS = 0.75;
@@ -206,7 +205,6 @@ function createLogBarkNormalTexture(): THREE.CanvasTexture {
  */
 export class Fire {
   readonly position: THREE.Vector3;
-  readonly interactable: Interactable;
 
   private readonly group: THREE.Group;
   private readonly light: THREE.PointLight;
@@ -249,15 +247,6 @@ export class Fire {
     crackleGain.gain.value = CRACKLE_FIXED_GAIN;
     this.crackle.output.connect(crackleGain);
     crackleGain.connect(audio.master);
-
-    this.interactable = {
-      object: this.group,
-      prompt: (state) => (state.logs > 0 ? 'Eで薪をくべる' : '薪がない。木を切ろう'),
-      canInteract: (state) => state.logs > 0,
-      interact: (state) => {
-        state.feedFire();
-      },
-    };
   }
 
   /** 焚き火本体・火の粉の表示/非表示（campsite にいる間だけ表示する。main.ts がスポット切替で呼ぶ）。 */

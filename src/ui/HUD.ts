@@ -13,26 +13,14 @@ const KETTLE_LABELS: Record<KettleState, string> = {
   ready: 'できた',
 };
 
-/** 画面中央下の文脈プロンプト・左下の所持品トレイ・一時的な誘導/通知文言を表示するオーバーレイ HUD。 */
+/** 左下の所持品トレイ・一時的な誘導/通知文言を表示するオーバーレイ HUD。 */
 export class HUD {
-  private readonly promptEl: HTMLDivElement;
   private readonly inventoryEl: HTMLDivElement;
   private readonly flashEl: HTMLDivElement;
   private readonly helpButtonEl: HTMLButtonElement;
   private flashTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
-    this.promptEl = document.createElement('div');
-    this.promptEl.style.position = 'fixed';
-    this.promptEl.style.left = '50%';
-    this.promptEl.style.bottom = '10%';
-    this.promptEl.style.transform = 'translateX(-50%)';
-    this.promptEl.style.color = '#fff';
-    this.promptEl.style.fontFamily = 'sans-serif';
-    this.promptEl.style.fontSize = '1.1rem';
-    this.promptEl.style.textShadow = '0 1px 3px rgba(0,0,0,0.8)';
-    this.promptEl.style.pointerEvents = 'none';
-
     this.inventoryEl = document.createElement('div');
     this.inventoryEl.style.position = 'fixed';
     this.inventoryEl.style.left = '3%';
@@ -85,7 +73,7 @@ export class HUD {
       this.helpButtonEl.style.opacity = String(HELP_BUTTON_OPACITY);
     });
 
-    document.getElementById('ui-root')?.append(this.promptEl, this.inventoryEl, this.flashEl, this.helpButtonEl);
+    document.getElementById('ui-root')?.append(this.inventoryEl, this.flashEl, this.helpButtonEl);
 
     this.setInventory(0, 'empty');
   }
@@ -95,18 +83,11 @@ export class HUD {
     this.helpButtonEl.addEventListener('click', cb);
   }
 
-  setPrompt(text: string | null): void {
-    this.promptEl.textContent = text ?? '';
-  }
-
   setInventory(logs: number, kettle: KettleState): void {
     this.inventoryEl.textContent = `薪: ${logs}　ケトル: ${KETTLE_LABELS[kettle]}`;
   }
 
-  /**
-   * 無操作時に所持品トレイを消灯する（DOMは残す）。中央の文脈プロンプト（promptEl）は
-   * 体験の道標のため対象外（idle中に何も見ていなければ元々表示されない）。
-   */
+  /** 無操作時に所持品トレイ・ヘルプボタンを消灯する（DOMは残す）。 */
   setIdle(idle: boolean): void {
     this.inventoryEl.style.transition = `opacity ${idle ? IDLE_FADE_OUT_SECONDS : IDLE_FADE_IN_SECONDS}s ease`;
     this.inventoryEl.style.opacity = idle ? '0' : '1';

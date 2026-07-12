@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import type { AudioEngine } from '../audio/AudioEngine';
 import { playChop, playTreeFall } from '../audio/synths';
-import { Hotspot, type HotspotDirection } from '../pano/Hotspot';
 import type { GameState } from '../systems/GameState';
 
 const CHOPPABLE_HITS = 4;
@@ -35,14 +34,10 @@ const HEAD_ROUGHNESS = 0.4;
 const HEAD_METALNESS = 0.8;
 
 /**
- * campsite パノラマ内の実際の木の方向に置いた伐採ホットスポット（v1 systems/Chopping.ts から移植）。
- * 写真の木自体は動かせないため倒木アニメは実装せず、E/クリック4回で伐倒音を鳴らし薪+3を加算する
- * ところまでを表現する。画面右下の斧ビューモデルと振りアニメはv1のまま移植。
- * hotspot を Interaction へ登録/解除するのは main.ts（campsite にいる間だけ有効にするため）。
+ * 選択肢「木を切る」で自動的に4回振って伐倒音を鳴らし薪+3を加算する（v1 systems/Chopping.ts から移植）。
+ * 写真の木自体は動かせないため倒木アニメは実装しない。画面右下の斧ビューモデルと振りアニメはv1のまま移植。
  */
 export class Chopping {
-  readonly hotspot: Hotspot;
-
   private readonly axeGroup: THREE.Group;
   private axeSwingElapsed: number | null = null;
   private hitsRemaining = CHOPPABLE_HITS;
@@ -54,22 +49,10 @@ export class Chopping {
   }
 
   constructor(
-    scene: THREE.Scene,
     camera: THREE.Camera,
     private readonly audio: AudioEngine,
-    private readonly gs: GameState,
-    direction: HotspotDirection,
-    angularRadius: number
+    private readonly gs: GameState
   ) {
-    this.hotspot = new Hotspot(direction, angularRadius, {
-      prompt: () => (this.treeFelled ? '' : `Eで木を切る（あと${this.hitsRemaining}回）`),
-      canInteract: () => !this.treeFelled,
-      interact: () => this.onChop(),
-    });
-    // レイキャスト対象の matrixWorld を更新させるため、非表示でもシーングラフに加える必要がある
-    // （scene に入れないと matrixWorld が単位行列のままでレイが絶対に当たらない）。
-    scene.add(this.hotspot.object);
-
     this.axeGroup = this.buildAxeViewModel();
     camera.add(this.axeGroup);
   }

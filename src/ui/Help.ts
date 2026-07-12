@@ -4,7 +4,7 @@ const FLOW_INTRO_TEXT =
 /**
  * H キーまたは右下「?」ボタンで開閉する半透明オーバーレイ（Credits.ts と同じ構成）。
  * 操作方法・現在スポットのできること（動的）・体験の流れの短い紹介文を示す。
- * 開いている間は視点操作・E/クリックでの操作を止める（main.ts が isOpen を見て毎フレーム合成する。
+ * 開いている間は視点操作・選択肢での操作を止める（main.ts が isOpen を見て毎フレーム合成する。
  * SitSequence と同じ enabled フラグを直接ここでは書き換えない — 座り中との競合を避けるため）。
  */
 export class Help {
@@ -66,7 +66,7 @@ export class Help {
     controlsBody.style.fontSize = '0.95rem';
     controlsBody.append(
       this.buildLine('マウスドラッグ: 見回す'),
-      this.buildLine('E またはクリック: 行動する'),
+      this.buildLine('画面下の選択肢: 過ごし方を選ぶ'),
       this.buildLine('H または右下の「?」: このヘルプ')
     );
     panel.appendChild(controlsBody);

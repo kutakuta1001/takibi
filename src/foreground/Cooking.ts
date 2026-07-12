@@ -1,16 +1,11 @@
 import * as THREE from 'three';
 import type { AudioEngine } from '../audio/AudioEngine';
 import { playChime, playWaterFill } from '../audio/synths';
-import { Hotspot, type HotspotDirection } from '../pano/Hotspot';
+import type { HotspotDirection } from '../pano/Hotspot';
 import type { GameState } from '../systems/GameState';
-import type { Interactable } from '../systems/Interaction';
-import type { HUD } from '../ui/HUD';
 import type { SitSequence } from './SitSequence';
 
 const KETTLE_HEIGHT_ABOVE_FIRE = 1.0;
-const KETTLE_HITBOX_SIZE = 1.2;
-
-const COFFEE_READY_MESSAGE = 'コーヒーができた';
 
 const KETTLE_STEAM_COUNT = 20;
 const KETTLE_STEAM_RISE_SPEED = 0.3;
@@ -23,8 +18,6 @@ const KETTLE_STEAM_MAX_RISE = 0.9;
  * （riverside/snowfield の RestSpot と共有する単一インスタンス）。
  */
 export class Cooking {
-  readonly fireKettleInteractable: Interactable;
-  readonly waterHotspot: Hotspot;
   readonly kettlePosition: THREE.Vector3; // HotspotMarker（main.ts）がケトルの実座標を必要とするため公開
 
   private spotVisible = true; // campsite にいる間だけ true（ケトルは焚き火の位置にあるため）
@@ -34,14 +27,11 @@ export class Cooking {
 
   constructor(
     private readonly gs: GameState,
-    private readonly hud: HUD,
     private readonly audio: AudioEngine,
     private readonly sitSequence: SitSequence,
     scene: THREE.Scene,
     firePosition: THREE.Vector3,
-    private readonly fireLookDirection: HotspotDirection,
-    waterDirection: HotspotDirection,
-    waterAngularRadius: number
+    private readonly fireLookDirection: HotspotDirection
   ) {
     const kettlePosition = new THREE.Vector3(
       firePosition.x,
@@ -60,34 +50,10 @@ export class Cooking {
     this.kettleSteam.visible = false;
     scene.add(this.kettleSteam);
 
-    const hitboxGeometry = new THREE.BoxGeometry(KETTLE_HITBOX_SIZE, KETTLE_HITBOX_SIZE, KETTLE_HITBOX_SIZE);
-    const hitboxMaterial = new THREE.MeshBasicMaterial({ visible: false });
-    const hitbox = new THREE.Mesh(hitboxGeometry, hitboxMaterial);
-    hitbox.position.copy(kettlePosition);
-    scene.add(hitbox);
-
-    this.fireKettleInteractable = {
-      object: hitbox,
-      prompt: (state) => this.promptFor(state),
-      canInteract: (state) => this.canInteractFor(state),
-      interact: (state) => this.handleInteract(state),
-    };
-
-    this.waterHotspot = new Hotspot(waterDirection, waterAngularRadius, {
-      prompt: (state) => (state.kettle === 'empty' ? 'Eで水を汲む' : ''),
-      canInteract: (state) => state.kettle === 'empty',
-      interact: (state) => {
-        if (state.fillKettle()) {
-          playWaterFill(this.audio.ctx, this.audio.master);
-        }
-      },
-    });
-    scene.add(this.waterHotspot.object);
-
     gs.on('kettle-changed', () => this.onKettleChanged());
   }
 
-  /** main.ts が毎フレーム lookControls.enabled / interaction 有効状態を合成する際に使う。 */
+  /** main.ts が毎フレーム lookControls.enabled / StoryPanel の表示状態を合成する際に使う。 */
   get isSitting(): boolean {
     return this.sitSequence.active;
   }
@@ -123,37 +89,8 @@ export class Cooking {
     }
   }
 
-  private promptFor(gs: GameState): string {
-    switch (gs.kettle) {
-      case 'empty':
-        return '先に川で水を汲もう';
-      case 'filled':
-        return 'Eでケトルを火にかける';
-      case 'onFire':
-        return 'コーヒーを抽出中';
-      case 'ready':
-        return 'Eで座って飲む';
-      default:
-        return '';
-    }
-  }
-
-  private canInteractFor(gs: GameState): boolean {
-    if (this.sitSequence.active) return false;
-    return gs.kettle === 'filled' || gs.kettle === 'ready';
-  }
-
-  private handleInteract(gs: GameState): void {
-    if (gs.kettle === 'filled') {
-      gs.putKettleOnFire();
-    } else if (gs.kettle === 'ready') {
-      this.sitSequence.start({ lookDirection: this.fireLookDirection, coffee: this.gs });
-    }
-  }
-
   private onKettleChanged(): void {
     if (this.gs.kettle === 'ready') {
-      this.hud.flashMessage(COFFEE_READY_MESSAGE);
       playChime(this.audio.ctx, this.audio.master);
     }
   }

@@ -10,7 +10,6 @@ const MID_COLOR = 'rgba(255, 176, 90, 0.65)';
 const EDGE_COLOR = 'rgba(255, 150, 60, 0)';
 
 const BASE_OPACITY = 0.9;
-const FOCUSED_OPACITY_SCALE = 0.3; // 視線が合いプロンプトが出ている間は控えめに
 const OPACITY_RESPONSE = 6; // 大きいほど出現/消灯が素早く追従する（ソフトに現れる程度に留める）
 
 const PULSE_PERIOD_SECONDS = 3; // ゆっくり呼吸するパルス
@@ -53,7 +52,6 @@ function createMarkerTexture(): THREE.Texture {
 export class HotspotMarker {
   private readonly sprite: THREE.Sprite;
   private available = false;
-  private focused = false;
   private currentOpacity = 0;
   private time = 0;
 
@@ -72,20 +70,15 @@ export class HotspotMarker {
     scene.add(this.sprite);
   }
 
-  /** canInteract 相当（または prompt が非空）のときだけ表示する。 */
+  /** いま出ている選択肢がこのマーカーを指しているときだけ表示する。 */
   setAvailable(on: boolean): void {
     this.available = on;
-  }
-
-  /** 視線が合いプロンプトが出ている間は控えめに（0.3倍の不透明度）。 */
-  setFocused(on: boolean): void {
-    this.focused = on;
   }
 
   update(dt: number, camera: THREE.Camera): void {
     this.time += dt;
 
-    const targetOpacity = this.available ? BASE_OPACITY * (this.focused ? FOCUSED_OPACITY_SCALE : 1) : 0;
+    const targetOpacity = this.available ? BASE_OPACITY : 0;
     const t = 1 - Math.exp(-OPACITY_RESPONSE * dt);
     this.currentOpacity += (targetOpacity - this.currentOpacity) * t;
 

@@ -7,20 +7,22 @@ import { Title } from './ui/Title';
 import { Credits } from './ui/Credits';
 import { HUD } from './ui/HUD';
 import { AreaTitle } from './ui/AreaTitle';
-import { nextHint, SPOT_NAMES } from './ui/hints';
 import { Help } from './ui/Help';
+import { StoryPanel } from './ui/StoryPanel';
 import { IdleWatcher } from './ui/IdleWatcher';
 import { VolumeControl } from './ui/VolumeControl';
 import { DebugOverlay } from './ui/DebugOverlay';
 import { PanoScene, SNOWFIELD_NIGHT_GRADING } from './pano/PanoScene';
 import { LookControls } from './pano/LookControls';
 import { SpotManager, type Spot } from './pano/SpotManager';
-import { computeStarMaskFromImage, type Direction } from './pano/StarMask';
+import { computeStarMaskFromImage, type Direction as SkyDirection } from './pano/StarMask';
 import { Snowfall } from './pano/Snowfall';
 import { Gusts } from './pano/Gusts';
 import { Grading } from './pano/Grading';
 import { GameState } from './systems/GameState';
-import { Interaction, type Interactable } from './systems/Interaction';
+import { SPOT_NAMES, type MarkerId, type SpotId, type StoryChoice, type StoryContext } from './story/scenario';
+import { StoryEngine } from './story/StoryEngine';
+import { Direction } from './story/Direction';
 import { positionToDirection } from './pano/Hotspot';
 import { HotspotMarker } from './pano/HotspotMarker';
 import { Chopping } from './foreground/Chopping';
@@ -46,10 +48,10 @@ const STAR_HIDE_DAYNESS = 0.25; // これ以上明るい間（夕方側）は星
  * AdditiveBlending で加算合成するため、マスク値0=無加算=見えない、という扱いになる
  * （Fire.ts の火の粉パーティクルと同じ手法）。
  */
-function buildStarField(): { points: THREE.Points; directions: Direction[] } {
+function buildStarField(): { points: THREE.Points; directions: SkyDirection[] } {
   const positions = new Float32Array(STAR_COUNT * 3);
   const colors = new Float32Array(STAR_COUNT * 3); // 初期値0（マスク適用まで非表示のまま安全側に倒す）
-  const directions: Direction[] = [];
+  const directions: SkyDirection[] = [];
   const rand = Alea('takibi-stars');
   for (let i = 0; i < STAR_COUNT; i++) {
     const theta = rand() * Math.PI * 2;
@@ -82,7 +84,6 @@ function buildStarField(): { points: THREE.Points; directions: Direction[] } {
 // campsite パノラマ内の実際の木の方向（yaw/pitch）。Phase S で forest_slope に差し替えた際、
 // 太い一本の木の幹が視界正面やや左に来る向きへプレイテストで再調整済み。
 const TREE_DIRECTION = { yaw: -0.33, pitch: -0.08 };
-const TREE_ANGULAR_RADIUS = 0.08; // rad（約4.6度）
 
 // 焚き火はカメラ（原点・目線高さ）から約2.5m先の地面。EYE_HEIGHTだけ下げて地面基準にする。
 const EYE_HEIGHT = 1.6;
@@ -93,18 +94,15 @@ const FIRE_LOOK_DIRECTION = { yaw: 0, pitch: -0.5 };
 // riverside パノラマ内の水面の方向（yaw/pitch）。Phase S で xanderklinge に差し替えた際、
 // 正面の小さな滝と手前の流れが同時に収まる向きへプレイテストで再調整済み。
 const WATER_DIRECTION = { yaw: 0, pitch: -0.3 };
-const WATER_ANGULAR_RADIUS = 0.15; // rad（約8.6度、水面は的が大きいのでTREE_ANGULAR_RADIUSより広め）
 
 // riverside の「座って眺める」休憩スポット。滝の脇の苔むした岩場・倒木に座り、
 // 正面の滝を眺める向きへ視線が動く（プレイテストで確定した方向）。
 const RIVERSIDE_SEAT_DIRECTION = { yaw: 0.6, pitch: -0.45 };
-const RIVERSIDE_SEAT_ANGULAR_RADIUS = 0.14;
 const RIVERSIDE_VIEW_DIRECTION = { yaw: 0, pitch: -0.18 };
 
 // snowfield の「座って眺める」休憩スポット（山頂の一杯の舞台）。山頂の岩稜に座り、
 // 稜線と谷の展望を眺める向きへ視線が動く（プレイテストで確定した方向）。
 const SNOWFIELD_SEAT_DIRECTION = { yaw: -1.2, pitch: -0.5 };
-const SNOWFIELD_SEAT_ANGULAR_RADIUS = 0.14;
 const SNOWFIELD_VIEW_DIRECTION = { yaw: -1.2, pitch: -0.15 };
 
 const SPOT_LABELS: Record<Spot['id'], string> = {
@@ -121,12 +119,8 @@ const GROUND_BY_SPOT: Record<Spot['id'], Ground> = {
 };
 const TRANSITION_STEP_COUNT = 2;
 
-// UIの消灯（Phase U）。無操作でナビボタン・所持品トレイが消え、世界だけが残る。
+// UIの消灯（Phase U）。無操作で所持品トレイが消え、世界だけが残る。
 const IDLE_SECONDS = 8;
-const IDLE_FADE_OUT_SECONDS = 1.5; // idle化: ゆっくりフェードアウト
-const IDLE_FADE_IN_SECONDS = 0.3; // 復帰: すぐフェードイン
-const NAV_BUTTON_OPACITY = 0.7; // 通常時の視認性を一段下げる
-const NAV_BUTTON_HOVER_OPACITY = 1.0;
 
 // public/ 配下の静的アセットは vite.config.ts の base（相対配信用 './'）の対象外のため、
 // 先頭スラッシュ付きの絶対パス '/panos/...' だとサブパス配信（例: GitHub Pages の
@@ -329,8 +323,6 @@ const hud = new HUD();
 const areaTitle = new AreaTitle();
 const volumeControl = new VolumeControl(audio.master);
 const input = new Input();
-const interaction = new Interaction(engine.camera, input, gs, engine.renderer.domElement);
-interaction.onBlocked((message) => hud.flashMessage(message));
 
 function refreshInventory(): void {
   hud.setInventory(gs.logs, gs.kettle);
@@ -339,36 +331,89 @@ gs.on('logs-changed', refreshInventory);
 gs.on('kettle-changed', refreshInventory);
 refreshInventory();
 
-const chopping = new Chopping(engine.scene, engine.camera, audio, gs, TREE_DIRECTION, TREE_ANGULAR_RADIUS);
+const chopping = new Chopping(engine.camera, audio, gs);
 const fire = new Fire(engine.scene, gs, audio, FIRE_POSITION);
 // 座って眺める/飲む演出は campsite(Cooking)・riverside/snowfield(RestSpot) で共有する単一インスタンス
-// （座りは同時に1つ。lookControls のロックもここに集約される。E/クリック抑止は main.ts が毎フレーム
-// interaction.setEnabled(!cooking.isSitting && !help.isOpen) で合成する）。
+// （座りは同時に1つ。lookControls のロックもここに集約される）。
 const sitSequence = new SitSequence(lookControls, engine.camera, audio);
-const cooking = new Cooking(
-  gs,
-  hud,
-  audio,
-  sitSequence,
-  engine.scene,
-  FIRE_POSITION,
-  FIRE_LOOK_DIRECTION,
-  WATER_DIRECTION,
-  WATER_ANGULAR_RADIUS
-);
-const riversideRest = new RestSpot(engine.scene, sitSequence, {
-  hotspotDirection: RIVERSIDE_SEAT_DIRECTION,
-  angularRadius: RIVERSIDE_SEAT_ANGULAR_RADIUS,
-  lookDirection: RIVERSIDE_VIEW_DIRECTION,
-});
+const cooking = new Cooking(gs, audio, sitSequence, engine.scene, FIRE_POSITION, FIRE_LOOK_DIRECTION);
+const riversideRest = new RestSpot(sitSequence, { lookDirection: RIVERSIDE_VIEW_DIRECTION });
 // 山頂の一杯: campsite で淹れたコーヒー（kettle==='ready'はグローバル保持）をここで座って飲める。
 // 完了通知・チャイムは出さない（静かに終わるのが正解。SitSequence.end は drinkCoffee() のみ呼ぶ）。
-const snowfieldRest = new RestSpot(engine.scene, sitSequence, {
-  hotspotDirection: SNOWFIELD_SEAT_DIRECTION,
-  angularRadius: SNOWFIELD_SEAT_ANGULAR_RADIUS,
+const snowfieldRest = new RestSpot(sitSequence, {
   lookDirection: SNOWFIELD_VIEW_DIRECTION,
   coffeeAware: true,
 });
+
+const storyEngine = new StoryEngine();
+const storyPanel = new StoryPanel();
+
+function currentCtx(): StoryContext {
+  return {
+    spot: spotManager.current,
+    logs: gs.logs,
+    kettle: gs.kettle,
+    fireLit: gs.fireFuel > 0,
+    treeFelled: chopping.felled,
+  };
+}
+
+async function travel(to: SpotId): Promise<void> {
+  const departureSpot = SPOTS.find((s) => s.id === spotManager.current);
+  const wasBusy = spotManager.busy;
+  const transition = spotManager.transitionTo(to);
+  // 遷移が実際に始まった（busy が false→true になった）ときだけ出発地の足音を鳴らす
+  if (!wasBusy && spotManager.busy && departureSpot) {
+    playFootsteps(audio.ctx, footstepsBus, GROUND_BY_SPOT[departureSpot.id], TRANSITION_STEP_COUNT);
+  }
+  const result = await transition;
+  if (result.status === 'failed') {
+    hud.flashMessage('たどり着けなかった。通信を確認してもう一度');
+    // onApproach で先行フェードしていた環境音ミックスを出発地へ巻き戻す
+    if (departureSpot) {
+      ambientTargetSpot = departureSpot;
+    }
+  }
+}
+
+const direction = new Direction({
+  lookControls,
+  gs,
+  chopping,
+  cooking,
+  riversideRest,
+  snowfieldRest,
+  directions: {
+    tree: TREE_DIRECTION,
+    fire: FIRE_LOOK_DIRECTION,
+    kettle: positionToDirection(cooking.kettlePosition).direction,
+    water: WATER_DIRECTION,
+  },
+  travel,
+});
+
+let lastStoryKey = '';
+function refreshStory(narration?: string): void {
+  const view = storyEngine.view(currentCtx());
+  const text = narration ?? view.text;
+  const key = `${text}|${view.choices.map((c) => c.label).join('|')}`;
+  if (key === lastStoryKey) return;
+  lastStoryKey = key;
+  storyPanel.show(text, view.choices.map((c) => c.label), (index) => {
+    void chooseStory(view.choices[index]);
+  });
+}
+
+async function chooseStory(choice: StoryChoice): Promise<void> {
+  if (direction.busy || spotManager.busy || cooking.isSitting) return;
+  storyPanel.setChoicesVisible(false);
+  await direction.run(choice);
+  storyPanel.setChoicesVisible(true);
+  refreshStory(choice.narration);
+}
+
+gs.on('logs-changed', () => refreshStory());
+gs.on('kettle-changed', () => refreshStory());
 
 // インタラクト可能な場所に灯す、柔らかい光のマーカー（見つけやすさ）。伐採の木・水汲み・座り場所は
 // Hotspot と同じ方向+既定距離（HOTSPOT_DISTANCE）に、焚き火の薪くべ・ケトルは実座標
@@ -382,64 +427,38 @@ const waterMarker = new HotspotMarker(engine.scene, WATER_DIRECTION);
 const riversideSeatMarker = new HotspotMarker(engine.scene, RIVERSIDE_SEAT_DIRECTION);
 const snowfieldSeatMarker = new HotspotMarker(engine.scene, SNOWFIELD_SEAT_DIRECTION);
 
-// マーカー1つぶんの設定（対象Interactable + どのスポットにいるときだけ判定するか）。
-// 表示条件はそのInteractableのcanInteractがtrueか、prompt(gs)が非空のとき（座り場所・水汲み・
-// 焚き火の薪くべ・ケトルは大半の状態でpromptが非空のため、そのスポットにいる間はほぼ常灯になる。
-// 伐採の木だけは倒した後にprompt/canInteractがともに空/falseになり消灯する）。
-const markerBindings: Array<{ marker: HotspotMarker; interactable: Interactable; spotId: Spot['id'] }> = [
-  { marker: treeMarker, interactable: chopping.hotspot, spotId: 'campsite' },
-  { marker: fireMarker, interactable: fire.interactable, spotId: 'campsite' },
-  { marker: kettleMarker, interactable: cooking.fireKettleInteractable, spotId: 'campsite' },
-  { marker: waterMarker, interactable: cooking.waterHotspot, spotId: 'riverside' },
-  { marker: riversideSeatMarker, interactable: riversideRest.hotspot, spotId: 'riverside' },
-  { marker: snowfieldSeatMarker, interactable: snowfieldRest.hotspot, spotId: 'snowfield' },
+// マーカー1つぶんの設定（対応する選択肢の marker + どのスポットにいるときだけ判定するか）。
+// 表示条件は、そのスポットにいて、いま出ている選択肢の中に同じ markerId を持つものがあるとき
+// （main.ts の onUpdate が毎フレーム storyEngine.view(currentCtx()) から判定する）。
+const markerBindings: Array<{ marker: HotspotMarker; spotId: SpotId; markerId: MarkerId }> = [
+  { marker: treeMarker, spotId: 'campsite', markerId: 'tree' },
+  { marker: fireMarker, spotId: 'campsite', markerId: 'fire' },
+  { marker: kettleMarker, spotId: 'campsite', markerId: 'kettle' },
+  { marker: waterMarker, spotId: 'riverside', markerId: 'water' },
+  { marker: riversideSeatMarker, spotId: 'riverside', markerId: 'riversideSeat' },
+  { marker: snowfieldSeatMarker, spotId: 'snowfield', markerId: 'snowfieldSeat' },
 ];
 
-/** Help オーバーレイの「この場所でできること」。markerBindings を再利用し、開いた瞬間の実際の prompt(gs) を動的に列挙する。 */
+/** Help オーバーレイの「この場所でできること」。いま出ている選択肢のラベルをそのまま列挙する。 */
 function currentSpotActions(): string[] {
-  const spotId = spotManager.current;
-  return markerBindings
-    .filter((binding) => binding.spotId === spotId)
-    .map((binding) => binding.interactable.prompt(gs))
-    .filter((text) => text !== '');
+  return storyEngine.view(currentCtx()).choices.map((choice) => choice.label);
 }
 
 /**
  * 伐採・焚き火・ケトルは campsite だけ、水汲みは riverside だけで有効にする。
  * riverside/snowfield には「座って眺める」休憩スポット（RestSpot）を置く（snowfield は
  * campsite で淹れたコーヒーを飲める「山頂の一杯」にもなる）。
- * ホットスポットの登録/解除（レイキャスト対象）だけでなく、焚き火・斧・ケトルの3D表示自体も
- * 切り替える（これらは常にシーンに存在するため、切り替えないと別スポットに透けて見えてしまう）。
+ * 焚き火・斧・ケトルの3D表示自体を切り替える（これらは常にシーンに存在するため、
+ * 切り替えないと別スポットに透けて見えてしまう）。
  */
-function updateHotspotsForSpot(spotId: Spot['id']): void {
+function updateForegroundForSpot(spotId: Spot['id']): void {
   const atCampsite = spotId === 'campsite';
-  const atRiverside = spotId === 'riverside';
-  const atSnowfield = spotId === 'snowfield';
 
   chopping.setVisible(atCampsite);
   fire.setVisible(atCampsite);
   cooking.setVisible(atCampsite);
-
-  // 一旦すべて外してから、このスポットで有効なものだけ入れ直す（remove は未登録でも安全）。
-  interaction.remove(chopping.hotspot);
-  interaction.remove(fire.interactable);
-  interaction.remove(cooking.fireKettleInteractable);
-  interaction.remove(cooking.waterHotspot);
-  interaction.remove(riversideRest.hotspot);
-  interaction.remove(snowfieldRest.hotspot);
-
-  if (atCampsite) {
-    interaction.add(chopping.hotspot);
-    interaction.add(fire.interactable);
-    interaction.add(cooking.fireKettleInteractable);
-  } else if (atRiverside) {
-    interaction.add(cooking.waterHotspot);
-    interaction.add(riversideRest.hotspot);
-  } else if (atSnowfield) {
-    interaction.add(snowfieldRest.hotspot);
-  }
 }
-updateHotspotsForSpot(SPOTS[0].id);
+updateForegroundForSpot(SPOTS[0].id);
 
 const grading = new Grading();
 const snowfall = new Snowfall(engine.scene);
@@ -454,15 +473,15 @@ const spotManager = new SpotManager(
     for (const [id, pano] of panoScenes) {
       pano.mesh.visible = id === spot.id;
     }
-    updateHotspotsForSpot(spot.id);
+    updateForegroundForSpot(spot.id);
     applyStarMaskForSpot(spot.id);
     snowfall.setEnabled(spot.snowfall);
     breath.setEnabled(spot.id === 'snowfield');
     reverb.apply(REVERB_PRESETS[spot.id]);
     ambientTargetSpot = spot; // 保険（通常は onApproach で既に切り替わっている）
     playFootsteps(audio.ctx, footstepsBus, GROUND_BY_SPOT[spot.id], TRANSITION_STEP_COUNT); // 到着地の足音
-    updateSpotButtons();
-    areaTitle.show(SPOT_NAMES[spot.id], nextHint(gs, spot.id));
+    refreshStory();
+    areaTitle.show(SPOT_NAMES[spot.id]);
   },
   {
     onApproach: (target) => {
@@ -477,7 +496,7 @@ const spotManager = new SpotManager(
 // ?debug=1 のときだけ表示するfps/レンダリング統計オーバーレイ（デフォルトはDOMを作らず無影響）。
 const debugOverlay = new DebugOverlay(engine.renderer, () => SPOT_LABELS[spotManager.current]);
 
-// H キー/右下「?」ボタンで開閉するヘルプ。開いている間の視点操作・E/クリックの停止は
+// H キー/右下「?」ボタンで開閉するヘルプ。開いている間の視点操作・選択肢操作の停止は
 // engine.onUpdate 側で毎フレーム合成する（座り中との競合を避けるため、ここでは直接enabledを書かない）。
 const help = new Help(
   () => SPOT_NAMES[spotManager.current],
@@ -485,78 +504,6 @@ const help = new Help(
 );
 hud.onHelpClick(() => help.toggle());
 input.onKeyPress('KeyH', () => help.toggle());
-
-// 画面端の遷移先ボタン群。専用の要素を #ui-root に直接追加する（HUD.ts はプロンプト/所持品トレイ用）。
-// ハブ&スポーク構成のため、現在スポットの destinations 数に応じて複数ボタンを縦に並べる
-// （campsite にいるときは「川辺へ →」「雪山へ →」の2つ、riverside/snowfield では1つ）。
-const spotButtonsContainer = document.createElement('div');
-spotButtonsContainer.style.position = 'fixed';
-spotButtonsContainer.style.right = '4%';
-spotButtonsContainer.style.bottom = '10%';
-spotButtonsContainer.style.display = 'flex';
-spotButtonsContainer.style.flexDirection = 'column';
-spotButtonsContainer.style.alignItems = 'flex-end';
-spotButtonsContainer.style.gap = '0.6rem';
-spotButtonsContainer.style.opacity = '1';
-spotButtonsContainer.style.transition = `opacity ${IDLE_FADE_IN_SECONDS}s ease`;
-// タイトル表示中（engine.start() 前）は見た目上タイトルの下に隠れているだけでキーボードフォーカスは
-// 素通りしてしまう（Tab 順序が Title の開始ボタンより前に来てしまう）。visibility: hidden は
-// フォーカス対象からも除外されるため、ここで塞いでおく。engine.start() 後の最初のフレームで
-// 下の onUpdate が busy/isSitting に応じて visible に戻す。
-spotButtonsContainer.style.visibility = 'hidden';
-uiRoot.appendChild(spotButtonsContainer);
-
-function makeSpotButton(destinationId: Spot['id']): HTMLButtonElement {
-  const button = document.createElement('button');
-  button.style.padding = '0.6rem 1.1rem';
-  button.style.fontSize = '1rem';
-  button.style.fontFamily = 'sans-serif';
-  button.style.color = '#fff';
-  button.style.background = 'rgba(0, 0, 0, 0.35)';
-  button.style.border = '1px solid rgba(255, 255, 255, 0.6)';
-  button.style.borderRadius = '999px';
-  button.style.cursor = 'pointer';
-  button.style.pointerEvents = 'auto';
-  button.style.opacity = String(NAV_BUTTON_OPACITY);
-  button.style.transition = 'opacity 0.2s ease';
-  button.textContent = `${SPOT_LABELS[destinationId]}へ →`;
-  button.addEventListener('mouseenter', () => {
-    button.style.opacity = String(NAV_BUTTON_HOVER_OPACITY);
-  });
-  button.addEventListener('mouseleave', () => {
-    button.style.opacity = String(NAV_BUTTON_OPACITY);
-  });
-  button.addEventListener('click', () => {
-    if (cooking.isSitting) return; // 座って飲む演出中はスポット遷移を始めない
-    const departureSpot = SPOTS.find((s) => s.id === spotManager.current);
-    const wasBusy = spotManager.busy;
-    void spotManager.transitionTo(destinationId).then((result) => {
-      if (result.status === 'failed') {
-        hud.flashMessage('たどり着けなかった。通信を確認してもう一度');
-        // onApproach で先行フェードインを始めていた場合、環境音の目的地が到着先に
-        // 切り替わったままになっている。現在地（=留まる出発地）へ巻き戻す。
-        if (departureSpot) {
-          ambientTargetSpot = departureSpot;
-        }
-      }
-    });
-    // 遷移が実際に始まった（busy が false→true になった）ときだけ、出発地の足音を鳴らす
-    // （フェードアウト開始と同時、というタイミングをここで捉える）。
-    if (!wasBusy && spotManager.busy && departureSpot) {
-      playFootsteps(audio.ctx, footstepsBus, GROUND_BY_SPOT[departureSpot.id], TRANSITION_STEP_COUNT);
-    }
-  });
-  return button;
-}
-
-function updateSpotButtons(): void {
-  spotButtonsContainer.replaceChildren();
-  const currentSpot = SPOTS.find((s) => s.id === spotManager.current) ?? SPOTS[0];
-  for (const destinationId of currentSpot.destinations) {
-    spotButtonsContainer.appendChild(makeSpotButton(destinationId));
-  }
-}
-updateSpotButtons();
 
 // スポット遷移時の暗転（黒ではなく白寄りのやわらかい暗転）。
 const fadeOverlay = document.createElement('div');
@@ -567,13 +514,11 @@ fadeOverlay.style.opacity = '0';
 fadeOverlay.style.pointerEvents = 'none';
 uiRoot.appendChild(fadeOverlay);
 
-// 無操作でナビボタン・所持品トレイが消え、世界だけが残る（中央の文脈プロンプトは対象外）。
+// 無操作で所持品トレイが消え、世界だけが残る（StoryPanel は体験の入り口のため対象外）。
 const idleWatcher = new IdleWatcher(IDLE_SECONDS);
 idleWatcher.onChange((idle) => {
   hud.setIdle(idle);
   volumeControl.setIdle(idle);
-  spotButtonsContainer.style.transition = `opacity ${idle ? IDLE_FADE_OUT_SECONDS : IDLE_FADE_IN_SECONDS}s ease`;
-  spotButtonsContainer.style.opacity = idle ? '0' : '1';
 });
 window.addEventListener('mousemove', () => idleWatcher.activity());
 window.addEventListener('keydown', () => idleWatcher.activity());
@@ -591,6 +536,8 @@ document.addEventListener('visibilitychange', () => {
     void audio.ctx.resume();
   }
 });
+
+let lastFireLit = false;
 
 engine.onUpdate((dt) => {
   const gated = pauseGate.filter(dt);
@@ -630,29 +577,29 @@ engine.onUpdate((dt) => {
   applyAmbientAudio(dayness, gusts.strength);
 
   fadeOverlay.style.opacity = String(spotManager.fadeOpacity);
-  spotButtonsContainer.style.visibility = spotManager.busy || cooking.isSitting ? 'hidden' : 'visible';
   // 暗転が完了してもまだ遷移先の読み込みが終わっていない間、待たされている理由を示す。
   if (spotManager.pendingPrepare) {
     hud.flashMessage('向かっている…', 5);
   }
 
-  // 座り中・ヘルプが開いている間はE/クリックでの行動を止める（SitSequence.start/endの
-  // 個別呼び出しと役割が重なるが、こちらは毎フレーム合成するため競合しない。値は常に上書きされ、
-  // enabled=falseのとき interaction.update() は常に prompt:null を返す）。
-  interaction.setEnabled(!cooking.isSitting && !help.isOpen);
-  const { prompt } = interaction.update();
-  hud.setPrompt(prompt);
+  // 火の消え際でも本文が追従するよう検出する（選択肢経由の変化は gs.on/chooseStory 側で対応済み）。
+  const fireLitNow = gs.fireFuel > 0;
+  if (fireLitNow !== lastFireLit) {
+    lastFireLit = fireLitNow;
+    refreshStory();
+  }
 
-  // マーカーは IdleWatcher の消灯対象外、座り中は全マーカー非表示。
-  const focusedTarget = interaction.target;
+  // 座り・スポット遷移・ヘルプ表示中はパネルごと静かに消す。
+  storyPanel.setHidden(spotManager.busy || cooking.isSitting || help.isOpen);
+
+  // マーカーは IdleWatcher の消灯対象外、座り中は全マーカー非表示。いま出ている選択肢が
+  // 指す markerId のものだけ点灯する。
+  const view = storyEngine.view(currentCtx());
   const currentSpotId = spotManager.current;
-  for (const { marker, interactable, spotId } of markerBindings) {
-    const available =
-      !cooking.isSitting &&
-      spotId === currentSpotId &&
-      (interactable.canInteract(gs) || interactable.prompt(gs) !== '');
-    marker.setAvailable(available);
-    marker.setFocused(focusedTarget === interactable && prompt !== null);
+  for (const { marker, spotId, markerId } of markerBindings) {
+    const lit =
+      !cooking.isSitting && spotId === currentSpotId && view.choices.some((c) => c.marker === markerId);
+    marker.setAvailable(lit);
     marker.update(dt, engine.camera);
   }
 });
@@ -683,7 +630,9 @@ const title = new Title(
     // （マスクも読み込み完了時のコールバックで計算済み）ので、開始スポットへ即時適用する。
     applyStarMaskForSpot(SPOTS[0].id);
     engine.start();
-    areaTitle.show(SPOT_NAMES[SPOTS[0].id], nextHint(gs, SPOTS[0].id));
+    areaTitle.show(SPOT_NAMES[SPOTS[0].id]);
+    refreshStory();
+    storyPanel.setHidden(false);
   },
   () => {
     tryUnlockAudio();
